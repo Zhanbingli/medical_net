@@ -1,0 +1,12 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+SQLAlchemy==2.0.30
+psycopg[binary]==3.2.10
+pydantic==2.7.1
+pydantic-settings==2.2.1
+graphene==3.3
+starlette-graphene3==0.6.0
+alembic==1.13.1
+python-dotenv==1.0.1
+redis==5.0.4
+rq==1.16.1

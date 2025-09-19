@@ -1,0 +1,28 @@
+[project]
+name = "drugnet-backend"
+version = "0.1.0"
+description = "Clinical drug interaction knowledge graph backend"
+authors = [{name = "Medical Net Team"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "B", "I", "UP", "N", "ASYNC", "Q"]
+ignore = ["E203", "E266", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["./app"]
