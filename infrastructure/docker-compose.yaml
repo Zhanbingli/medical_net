@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: drugnet
+      POSTGRES_PASSWORD: drugnet
+      POSTGRES_DB: drugnet
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ../backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg://drugnet:drugnet@db:5432/drugnet
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+
+  etl:
+    build: ../etl
+    command: python -m pipelines.scheduler
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg://drugnet:drugnet@db:5432/drugnet
+    volumes:
+      - ../etl:/app
+
+  frontend:
+    build: ../frontend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend:/app
+
+volumes:
+  pgdata:
