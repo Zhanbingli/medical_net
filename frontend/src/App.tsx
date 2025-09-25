@@ -1,22 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import GraphCanvas from './components/GraphCanvas';
 import SearchPanel from './components/SearchPanel';
 import DetailPanel from './components/DetailPanel';
 import StatusMessage from './components/StatusMessage';
+import GraphSummaryPanel from './components/GraphSummaryPanel';
+import GraphLegend from './components/GraphLegend';
 import { useDrugDetail } from './hooks/useDrugDetail';
 import { useDrugGraph } from './hooks/useDrugGraph';
 import { useDrugSearch } from './hooks/useDrugSearch';
 import { useDrugCatalog } from './hooks/useDrugCatalog';
-import type { DrugSummary } from './types';
+import { useDebouncedValue } from './hooks/useDebouncedValue';
+import type { DrugSummary, GraphNode } from './types';
 
 const DEFAULT_DRUG_ID = 'drug_001';
 
 function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDrugId, setSelectedDrugId] = useState<string | null>(DEFAULT_DRUG_ID);
+  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
 
   const { data: catalog, isLoading: catalogLoading } = useDrugCatalog();
-  const { data: searchResults, isFetching: searchLoading } = useDrugSearch(searchTerm);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 220);
+  const { data: searchResults, isFetching: searchLoading } = useDrugSearch(debouncedSearchTerm);
   const {
     data: graph,
     isLoading: graphLoading,
@@ -44,6 +49,30 @@ function App() {
     setSelectedDrugId(drug.id);
     setSearchTerm(drug.name);
   };
+
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm('');
+  }, []);
+
+  const handleNodeSelect = useCallback(
+    (node: GraphNode) => {
+      if (node.type === 'drug') {
+        setSelectedDrugId(node.id);
+        setSearchTerm(node.label);
+      }
+    },
+    []
+  );
+
+  const handleNodeHover = useCallback((node: GraphNode | null) => {
+    setHoveredNode(node);
+  }, []);
+
+  useEffect(() => {
+    if (graphLoading || graphError) {
+      setHoveredNode(null);
+    }
+  }, [graphLoading, graphError]);
 
   const graphErrorMessage = graphError
     ? graphErrorObj instanceof Error
@@ -76,6 +105,7 @@ function App() {
           onSelect={handleSelect}
           selectedId={selectedDrugId}
           isLoading={suggestionLoading}
+          onClear={handleClearSearch}
         />
       </header>
 
@@ -86,7 +116,18 @@ function App() {
               <h2>用药关联图谱</h2>
               <p className="section-subtitle">拖拽节点查看药物、适应症与联用风险之间的连接。</p>
             </div>
+            <GraphLegend />
           </div>
+          {graph?.summary && <GraphSummaryPanel summary={graph.summary} />}
+          {hoveredNode && (
+            <div className="graph-hover-card">
+              <span className={`graph-hover-card__badge graph-hover-card__badge--${hoveredNode.type}`}>
+                {hoveredNode.type === 'drug' ? '药品' : '适应症'}
+              </span>
+              <strong className="graph-hover-card__title">{hoveredNode.label}</strong>
+              {hoveredNode.description && <p>{hoveredNode.description}</p>}
+            </div>
+          )}
           <div className="graph-area">
             {graphLoading && (
               <StatusMessage tone="info" title="图谱构建中…" description="正在载入节点与关系数据。" />
@@ -97,7 +138,15 @@ function App() {
             {!graphLoading && !graphError && !hasGraphData && (
               <StatusMessage tone="empty" title="暂无图谱" description="尚未找到可视化数据，尝试搜索其他药品。" />
             )}
-            {hasGraphData && <GraphCanvas graph={graph} className="graph-canvas" />}
+            {hasGraphData && (
+              <GraphCanvas
+                graph={graph}
+                className="graph-canvas"
+                selectedNodeId={selectedDrugId}
+                onNodeSelect={handleNodeSelect}
+                onNodeHover={handleNodeHover}
+              />
+            )}
           </div>
         </section>
 

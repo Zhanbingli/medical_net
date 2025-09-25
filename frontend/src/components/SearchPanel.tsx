@@ -8,14 +8,19 @@ interface SearchPanelProps {
   onSelect: (drug: DrugSummary) => void;
   selectedId: string | null;
   isLoading: boolean;
+  onClear?: () => void;
 }
 
-const SearchPanel = ({ value, onChange, suggestions, onSelect, selectedId, isLoading }: SearchPanelProps) => {
+const SearchPanel = ({ value, onChange, suggestions, onSelect, selectedId, isLoading, onClear }: SearchPanelProps) => {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (suggestions.length > 0) {
       onSelect(suggestions[0]);
     }
+  };
+
+  const handleClear = () => {
+    onClear?.();
   };
 
   return (
@@ -32,8 +37,16 @@ const SearchPanel = ({ value, onChange, suggestions, onSelect, selectedId, isLoa
             placeholder="输入药品名称或 ATC 编码"
             autoComplete="off"
           />
-          <button type="submit">快速定位</button>
+          {value && (
+            <button type="button" className="search-panel__clear" onClick={handleClear} aria-label="清除搜索">
+              清除
+            </button>
+          )}
+          <button type="submit" className="search-panel__submit">
+            快速定位
+          </button>
         </div>
+        <p className="search-panel__hint search-panel__hint--compact">按 Enter 定位首个匹配项</p>
       </form>
       <div className="search-panel__suggestions">
         {isLoading && <p className="search-panel__hint">检索中…</p>}

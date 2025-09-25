@@ -12,9 +12,19 @@ export interface GraphLink {
   metadata?: Record<string, unknown> | null;
 }
 
+export interface GraphSummary {
+  total_nodes: number;
+  total_links: number;
+  condition_count: number;
+  interaction_count: number;
+  partner_count: number;
+  severity_breakdown: Record<string, number>;
+}
+
 export interface DrugGraph {
   nodes: GraphNode[];
   links: GraphLink[];
+  summary: GraphSummary;
 }
 
 export interface DrugConditionSummary {

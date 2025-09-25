@@ -34,9 +34,11 @@ def test_dispatch_sources_skips_unknown_fetcher(mock_config, mock_writer, caplog
         }
     }
 
-    dispatch_sources(database_url="sqlite://")
+    results = dispatch_sources(database_url="sqlite://")
 
     assert "adapter error" in caplog.text
+    assert results
+    assert results[0].status == "adapter_error"
     mock_writer.return_value.upsert_frames.assert_not_called()
 
 
@@ -56,7 +58,55 @@ def test_dispatch_sources_writes_non_empty_frames(mock_load_adapter, mock_config
     }
     mock_load_adapter.return_value = adapter
 
-    dispatch_sources(database_url="sqlite://")
+    results = dispatch_sources(database_url="sqlite://")
 
     mock_writer.assert_called_once()
     mock_writer.return_value.upsert_frames.assert_called_once_with(adapter.run.return_value)
+    assert [result.status for result in results if result.identifier == "drugbank"] == ["loaded"]
+
+
+@patch("pipelines.scheduler.DatabaseWriter")
+@patch("pipelines.scheduler.load_sources_config")
+@patch("pipelines.scheduler.load_adapter")
+def test_dispatch_sources_respects_selection_filter(mock_load_adapter, mock_config, mock_writer):
+    mock_config.return_value = {
+        "sources": {
+            "drugbank": {"enabled": True, "fetcher": "drugbank"},
+            "openfda": {"enabled": True, "fetcher": "openfda"},
+        }
+    }
+
+    adapter = MagicMock()
+    adapter.run.return_value = {
+        "drugs": pd.DataFrame([{"id": "drug_1", "name": "demo"}])
+    }
+    mock_load_adapter.return_value = adapter
+
+    results = dispatch_sources(database_url="sqlite://", selected_sources=["drugbank"])
+
+    # Only the selected adapter should be loaded and executed.
+    mock_load_adapter.assert_called_once_with("drugbank", {"enabled": True, "fetcher": "drugbank"})
+    assert any(result.status == "filtered" for result in results if result.identifier == "openfda")
+    mock_writer.return_value.upsert_frames.assert_called_once_with(adapter.run.return_value)
+
+
+@patch("pipelines.scheduler.DatabaseWriter")
+@patch("pipelines.scheduler.load_sources_config")
+@patch("pipelines.scheduler.load_adapter")
+def test_dispatch_sources_dry_run_skips_writes(mock_load_adapter, mock_config, mock_writer):
+    mock_config.return_value = {
+        "sources": {
+            "drugbank": {"enabled": True, "fetcher": "drugbank"},
+        }
+    }
+
+    adapter = MagicMock()
+    adapter.run.return_value = {
+        "drugs": pd.DataFrame([{"id": "drug_1", "name": "demo"}])
+    }
+    mock_load_adapter.return_value = adapter
+
+    results = dispatch_sources(database_url="sqlite://", dry_run=True)
+
+    mock_writer.assert_not_called()
+    assert [result.status for result in results if result.identifier == "drugbank"] == ["captured"]
