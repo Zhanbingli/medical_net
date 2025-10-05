@@ -59,3 +59,20 @@ export interface DrugSummary {
   description?: string | null;
   atc_code?: string | null;
 }
+
+// D3 Force Simulation Types
+export interface D3SimulationNode extends GraphNode {
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
+  index?: number;
+}
+
+export interface D3SimulationLink {
+  source: string | D3SimulationNode;
+  target: string | D3SimulationNode;
+  label?: string | null;
+  metadata?: Record<string, unknown> | null;
+  index?: number;
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import type { DrugGraph, GraphNode } from '../types';
+import type { DrugGraph, GraphNode, D3SimulationNode, D3SimulationLink } from '../types';
 
 interface GraphCanvasProps {
   graph: DrugGraph;
@@ -35,13 +35,18 @@ const GraphCanvas = ({ graph, className, selectedNodeId, onNodeSelect, onNodeHov
     const width = svgElement.clientWidth || 800;
     const height = svgElement.clientHeight || 480;
 
-    const nodes = graph.nodes.map((node) => ({ ...node }));
-    const links = graph.links.map((link) => ({ ...link }));
+    const nodes: D3SimulationNode[] = graph.nodes.map((node) => ({ ...node }));
+    const links: D3SimulationLink[] = graph.links.map((link) => ({ ...link }));
+
+    // Helper function to get node ID from link source/target
+    const getNodeId = (node: string | D3SimulationNode): string => {
+      return typeof node === 'string' ? node : node.id;
+    };
 
     const adjacency = new Map<string, Set<string>>();
     for (const link of links) {
-      const sourceId = typeof link.source === 'string' ? link.source : String((link.source as any).id ?? link.source);
-      const targetId = typeof link.target === 'string' ? link.target : String((link.target as any).id ?? link.target);
+      const sourceId = getNodeId(link.source);
+      const targetId = getNodeId(link.target);
       if (!adjacency.has(sourceId)) {
         adjacency.set(sourceId, new Set());
       }
@@ -53,8 +58,13 @@ const GraphCanvas = ({ graph, className, selectedNodeId, onNodeSelect, onNodeHov
     }
 
     const simulation = d3
-      .forceSimulation(nodes as any)
-      .force('link', d3.forceLink(links as any).id((d: any) => d.id).distance(150))
+      .forceSimulation<D3SimulationNode>(nodes)
+      .force(
+        'link',
+        d3.forceLink<D3SimulationNode, D3SimulationLink>(links)
+          .id((d) => d.id)
+          .distance(150)
+      )
       .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(width / 2, height / 2));
 
@@ -110,28 +120,28 @@ const GraphCanvas = ({ graph, className, selectedNodeId, onNodeSelect, onNodeHov
       }
 
       node
-        .classed('is-focused', (d: any) => d.id === focusedId)
-        .classed('is-dimmed', (d: any) => !connected.has(d.id));
+        .classed('is-focused', (d) => d.id === focusedId)
+        .classed('is-dimmed', (d) => !connected.has(d.id));
 
       labels
-        .classed('is-focused', (d: any) => d.id === focusedId)
-        .classed('is-dimmed', (d: any) => !connected.has(d.id));
+        .classed('is-focused', (d) => d.id === focusedId)
+        .classed('is-dimmed', (d) => !connected.has(d.id));
 
       link
-        .classed('is-focused', (d: any) => {
-          const sourceId = typeof d.source === 'object' ? (d.source as any).id : d.source;
-          const targetId = typeof d.target === 'object' ? (d.target as any).id : d.target;
+        .classed('is-focused', (d) => {
+          const sourceId = getNodeId(d.source);
+          const targetId = getNodeId(d.target);
           return sourceId === focusedId || targetId === focusedId;
         })
-        .classed('is-dimmed', (d: any) => {
-          const sourceId = typeof d.source === 'object' ? (d.source as any).id : d.source;
-          const targetId = typeof d.target === 'object' ? (d.target as any).id : d.target;
+        .classed('is-dimmed', (d) => {
+          const sourceId = getNodeId(d.source);
+          const targetId = getNodeId(d.target);
           return !connected.has(sourceId) && !connected.has(targetId);
         });
     };
 
     const dragBehaviour = d3
-      .drag<SVGCircleElement, any>()
+      .drag<SVGCircleElement, D3SimulationNode>()
       .on('start', (event, d) => {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         d.fx = d.x;
@@ -148,11 +158,11 @@ const GraphCanvas = ({ graph, className, selectedNodeId, onNodeSelect, onNodeHov
       });
 
     node
-      .call(dragBehaviour as any)
-      .on('click', (_event, d: GraphNode & { id: string }) => {
+      .call(dragBehaviour as any) // D3 drag typing is complex with generics
+      .on('click', (_event, d) => {
         selectHandlerRef.current?.(d);
       })
-      .on('mouseenter', (_event, d: GraphNode & { id: string }) => {
+      .on('mouseenter', (_event, d) => {
         updateFocus(d.id);
         hoverHandlerRef.current?.(d);
       })
@@ -163,19 +173,43 @@ const GraphCanvas = ({ graph, className, selectedNodeId, onNodeSelect, onNodeHov
 
     simulation.on('tick', () => {
       link
-        .attr('x1', (d: any) => (d.source as any).x)
-        .attr('y1', (d: any) => (d.source as any).y)
-        .attr('x2', (d: any) => (d.target as any).x)
-        .attr('y2', (d: any) => (d.target as any).y);
+        .attr('x1', (d) => {
+          const source = typeof d.source === 'object' ? d.source : nodes.find(n => n.id === d.source);
+          return source?.x ?? 0;
+        })
+        .attr('y1', (d) => {
+          const source = typeof d.source === 'object' ? d.source : nodes.find(n => n.id === d.source);
+          return source?.y ?? 0;
+        })
+        .attr('x2', (d) => {
+          const target = typeof d.target === 'object' ? d.target : nodes.find(n => n.id === d.target);
+          return target?.x ?? 0;
+        })
+        .attr('y2', (d) => {
+          const target = typeof d.target === 'object' ? d.target : nodes.find(n => n.id === d.target);
+          return target?.y ?? 0;
+        });
 
-      node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y);
-      labels.attr('x', (d: any) => d.x).attr('y', (d: any) => d.y - 30);
+      node.attr('cx', (d) => d.x ?? 0).attr('cy', (d) => d.y ?? 0);
+      labels.attr('x', (d) => d.x ?? 0).attr('y', (d) => (d.y ?? 0) - 30);
     });
 
     updateFocus(selectedNodeId ?? null);
 
+    // Cleanup function to prevent memory leaks
     return () => {
       simulation.stop();
+
+      // Remove all event listeners
+      node.on('.drag', null);
+      node.on('click', null);
+      node.on('mouseenter', null);
+      node.on('mouseleave', null);
+
+      // Clear D3 selections
+      svg.selectAll('*').remove();
+
+      // Reset hover state
       hoverHandlerRef.current?.(null);
     };
   }, [graph, selectedNodeId]);

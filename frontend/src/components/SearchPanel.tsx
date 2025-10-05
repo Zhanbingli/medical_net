@@ -63,6 +63,8 @@ const SearchPanel = ({ value, onChange, suggestions, onSelect, selectedId, isLoa
                     type="button"
                     className={isActive ? 'is-active' : ''}
                     onClick={() => onSelect(drug)}
+                    aria-current={isActive ? 'true' : undefined}
+                    aria-label={`选择药品 ${drug.name}${drug.atc_code ? `, ATC编码 ${drug.atc_code}` : ''}`}
                   >
                     <span className="search-panel__drug-name">{drug.name}</span>
                     {drug.atc_code && <span className="search-panel__badge">ATC {drug.atc_code}</span>}

@@ -5,11 +5,13 @@ import DetailPanel from './components/DetailPanel';
 import StatusMessage from './components/StatusMessage';
 import GraphSummaryPanel from './components/GraphSummaryPanel';
 import GraphLegend from './components/GraphLegend';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useDrugDetail } from './hooks/useDrugDetail';
 import { useDrugGraph } from './hooks/useDrugGraph';
 import { useDrugSearch } from './hooks/useDrugSearch';
 import { useDrugCatalog } from './hooks/useDrugCatalog';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
+import { getErrorMessage } from './utils/errorHandling';
 import type { DrugSummary, GraphNode } from './types';
 
 const DEFAULT_DRUG_ID = 'drug_001';
@@ -35,7 +37,7 @@ function App() {
     error: detailErrorObj,
   } = useDrugDetail(selectedDrugId);
 
-  const normalizedTerm = searchTerm.trim();
+  const normalizedTerm = useMemo(() => searchTerm.trim(), [searchTerm]);
   const suggestions = useMemo(() => {
     if (normalizedTerm.length >= 2) {
       return searchResults ?? [];
@@ -74,19 +76,17 @@ function App() {
     }
   }, [graphLoading, graphError]);
 
-  const graphErrorMessage = graphError
-    ? graphErrorObj instanceof Error
-      ? graphErrorObj.message
-      : '图谱数据暂时不可用，请稍后再试。'
-    : undefined;
+  const graphErrorMessage = useMemo(
+    () => (graphError ? getErrorMessage(graphErrorObj, '图谱数据暂时不可用，请稍后再试。') : undefined),
+    [graphError, graphErrorObj]
+  );
 
-  const detailErrorMessage = detailError
-    ? detailErrorObj instanceof Error
-      ? detailErrorObj.message
-      : '无法获取药品详情。'
-    : undefined;
+  const detailErrorMessage = useMemo(
+    () => (detailError ? getErrorMessage(detailErrorObj, '无法获取药品详情。') : undefined),
+    [detailError, detailErrorObj]
+  );
 
-  const hasGraphData = graph && graph.nodes.length > 0;
+  const hasGraphData = useMemo(() => graph && graph.nodes.length > 0, [graph]);
 
   return (
     <div className="app-shell">
@@ -138,19 +138,23 @@ function App() {
             {!graphLoading && !graphError && !hasGraphData && (
               <StatusMessage tone="empty" title="暂无图谱" description="尚未找到可视化数据，尝试搜索其他药品。" />
             )}
-            {hasGraphData && (
-              <GraphCanvas
-                graph={graph}
-                className="graph-canvas"
-                selectedNodeId={selectedDrugId}
-                onNodeSelect={handleNodeSelect}
-                onNodeHover={handleNodeHover}
-              />
+            {hasGraphData && graph && (
+              <ErrorBoundary>
+                <GraphCanvas
+                  graph={graph}
+                  className="graph-canvas"
+                  selectedNodeId={selectedDrugId}
+                  onNodeSelect={handleNodeSelect}
+                  onNodeHover={handleNodeHover}
+                />
+              </ErrorBoundary>
             )}
           </div>
         </section>
 
-        <DetailPanel detail={detail} isLoading={detailLoading} errorMessage={detailErrorMessage} />
+        <ErrorBoundary>
+          <DetailPanel detail={detail} isLoading={detailLoading} errorMessage={detailErrorMessage} />
+        </ErrorBoundary>
       </main>
     </div>
   );
