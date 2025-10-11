@@ -4,10 +4,14 @@ import openai
 from anthropic import Anthropic
 from typing import Dict, Any, List, Optional
 from app.core.config import get_settings
+from app.core.logging import get_logger, log_execution_time
+from app.core.exceptions import AIServiceException
 from app.services.rxnorm_service import RxNormService
 from app.services.openfda_service import OpenFDAService
+from app.services.cache_service import get_cache_service, CacheStrategy
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 class AIAgentService:
@@ -34,16 +38,23 @@ class AIAgentService:
     def __init__(self):
         self.rxnorm_service = RxNormService()
         self.openfda_service = OpenFDAService()
+        self.cache = get_cache_service()
 
         # 初始化AI客户端
         if settings.ai_model.startswith("gpt"):
+            if not settings.openai_api_key:
+                logger.warning("OpenAI API key not configured")
             openai.api_key = settings.openai_api_key
             self.ai_provider = "openai"
         elif settings.ai_model.startswith("claude"):
+            if not settings.anthropic_api_key:
+                logger.warning("Anthropic API key not configured")
             self.anthropic_client = Anthropic(api_key=settings.anthropic_api_key)
             self.ai_provider = "anthropic"
         else:
             self.ai_provider = "openai"  # 默认使用OpenAI
+
+        logger.info(f"AI Agent initialized with provider: {self.ai_provider}")
 
     async def validate_drug_input(self, drug_name: str) -> Dict[str, Any]:
         """
@@ -130,9 +141,10 @@ class AIAgentService:
 
         return context
 
+    @log_execution_time
     async def generate_ai_response(self, context: str, user_question: str) -> str:
         """
-        使用AI生成响应
+        使用AI生成响应（带缓存）
 
         Args:
             context: 药物上下文信息
@@ -141,38 +153,61 @@ class AIAgentService:
         Returns:
             AI生成的响应
         """
+        # 生成缓存键
+        cache_key = f"ai_response:{hash(context + user_question)}"
+
+        # 尝试从缓存获取
+        cached_response = await self.cache.get(cache_key)
+        if cached_response:
+            logger.info("AI response retrieved from cache")
+            return cached_response
+
         user_message = f"{context}\n\n用户问题: {user_question}"
 
         try:
             if self.ai_provider == "openai":
+                logger.info("Calling OpenAI API", model=settings.ai_model)
                 response = openai.chat.completions.create(
                     model=settings.ai_model,
                     messages=[
                         {"role": "system", "content": self.SYSTEM_PROMPT},
                         {"role": "user", "content": user_message}
                     ],
-                    temperature=settings.ai_temperature
+                    temperature=settings.ai_temperature,
+                    max_tokens=settings.ai_max_tokens,
                 )
-                return response.choices[0].message.content
+                ai_response = response.choices[0].message.content
 
             elif self.ai_provider == "anthropic":
+                logger.info("Calling Anthropic API", model=settings.ai_model)
                 response = self.anthropic_client.messages.create(
                     model=settings.ai_model,
-                    max_tokens=1024,
+                    max_tokens=settings.ai_max_tokens,
                     system=self.SYSTEM_PROMPT,
                     messages=[
                         {"role": "user", "content": user_message}
                     ],
                     temperature=settings.ai_temperature
                 )
-                return response.content[0].text
+                ai_response = response.content[0].text
 
             else:
-                return "AI服务未配置或不可用"
+                logger.error("AI provider not configured")
+                raise AIServiceException("unknown", "AI服务未配置")
+
+            # 缓存响应
+            await self.cache.set(cache_key, ai_response, CacheStrategy.AI_RESPONSE_TTL)
+
+            logger.info("AI response generated successfully")
+            return ai_response
+
+        except openai.OpenAIError as e:
+            logger.error("OpenAI API error", error=str(e), error_type=type(e).__name__)
+            raise AIServiceException("openai", str(e))
 
         except Exception as e:
-            print(f"AI生成错误: {e}")
-            return f"AI服务暂时不可用，请稍后重试。错误: {str(e)}"
+            logger.error("AI generation error", error=str(e), error_type=type(e).__name__)
+            raise AIServiceException(self.ai_provider, str(e))
 
     async def check_drug_interactions(
         self,
