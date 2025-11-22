@@ -1,17 +1,24 @@
+# Python
 __pycache__/
 *.py[cod]
-.env
 .venv/
+.env
+
+# Node
 node_modules/
+npm-debug.log
 dist/
 build/
-coverage/
+
+# Editors / OS
 .DS_Store
 .idea/
 .vscode/
-*.log
-*.sqlite3
+
+# Tests / tooling caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# AI/IDE metadata
 .claude/

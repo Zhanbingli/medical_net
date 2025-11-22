@@ -1,8 +1,9 @@
 """AI Agent服务 - 药物相互作用和用药建议的核心AI引擎"""
 
-import openai
-from anthropic import Anthropic
 from typing import Dict, Any, List, Optional
+from anthropic import Anthropic
+from openai import OpenAI
+
 from app.core.config import get_settings
 from app.core.logging import get_logger, log_execution_time
 from app.core.exceptions import AIServiceException
@@ -40,19 +41,35 @@ class AIAgentService:
         self.openfda_service = OpenFDAService()
         self.cache = get_cache_service()
 
-        # 初始化AI客户端
-        if settings.ai_model.startswith("gpt"):
+        provider = settings.ai_provider.lower()
+        self.ai_provider = provider
+
+        if provider == "openai":
             if not settings.openai_api_key:
                 logger.warning("OpenAI API key not configured")
-            openai.api_key = settings.openai_api_key
-            self.ai_provider = "openai"
-        elif settings.ai_model.startswith("claude"):
+            self.openai_client = OpenAI(api_key=settings.openai_api_key)
+
+        elif provider == "deepseek":
+            api_key = settings.deepseek_api_key or settings.openai_api_key
+            if not api_key:
+                logger.warning("DeepSeek API key not configured")
+            self.openai_client = OpenAI(
+                api_key=api_key,
+                base_url=settings.deepseek_base_url,
+            )
+
+        elif provider in {"claude", "anthropic"}:
             if not settings.anthropic_api_key:
                 logger.warning("Anthropic API key not configured")
             self.anthropic_client = Anthropic(api_key=settings.anthropic_api_key)
-            self.ai_provider = "anthropic"
+            self.ai_provider = "claude"
+
         else:
-            self.ai_provider = "openai"  # 默认使用OpenAI
+            # 默认降级到 OpenAI
+            if not settings.openai_api_key:
+                logger.warning("OpenAI API key not configured")
+            self.openai_client = OpenAI(api_key=settings.openai_api_key)
+            self.ai_provider = "openai"
 
         logger.info(f"AI Agent initialized with provider: {self.ai_provider}")
 
@@ -165,9 +182,9 @@ class AIAgentService:
         user_message = f"{context}\n\n用户问题: {user_question}"
 
         try:
-            if self.ai_provider == "openai":
-                logger.info("Calling OpenAI API", model=settings.ai_model)
-                response = openai.chat.completions.create(
+            if self.ai_provider in {"openai", "deepseek"}:
+                logger.info("Calling OpenAI-compatible API", model=settings.ai_model, provider=self.ai_provider)
+                response = self.openai_client.chat.completions.create(
                     model=settings.ai_model,
                     messages=[
                         {"role": "system", "content": self.SYSTEM_PROMPT},
@@ -178,7 +195,7 @@ class AIAgentService:
                 )
                 ai_response = response.choices[0].message.content
 
-            elif self.ai_provider == "anthropic":
+            elif self.ai_provider == "claude":
                 logger.info("Calling Anthropic API", model=settings.ai_model)
                 response = self.anthropic_client.messages.create(
                     model=settings.ai_model,
@@ -201,11 +218,12 @@ class AIAgentService:
             logger.info("AI response generated successfully")
             return ai_response
 
-        except openai.OpenAIError as e:
-            logger.error("OpenAI API error", error=str(e), error_type=type(e).__name__)
-            raise AIServiceException("openai", str(e))
-
         except Exception as e:
+            # OpenAI 和 DeepSeek 共享客户端异常捕获
+            if self.ai_provider in {"openai", "deepseek"}:
+                logger.error("OpenAI-compatible API error", error=str(e), error_type=type(e).__name__)
+                raise AIServiceException(self.ai_provider, str(e))
+
             logger.error("AI generation error", error=str(e), error_type=type(e).__name__)
             raise AIServiceException(self.ai_provider, str(e))
 

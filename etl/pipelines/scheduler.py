@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -45,7 +46,8 @@ def dispatch_sources(
         if isinstance(database_settings, Mapping)
         else None
     )
-    effective_database_url = database_url or configured_url or DEFAULT_DATABASE_URL
+    env_url = os.getenv("DATABASE_URL")
+    effective_database_url = database_url or env_url or configured_url or DEFAULT_DATABASE_URL
     writer = DatabaseWriter(effective_database_url) if not dry_run else None
 
     sources = config.get("sources", {}) if isinstance(config, Mapping) else {}

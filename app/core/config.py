@@ -24,14 +24,19 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60  # 每分钟最多请求数
     rate_limit_per_hour: int = 1000  # 每小时最多请求数
 
+    # AI 提供方选择: openai / claude / deepseek
+    ai_provider: str = "openai"
+
     # AI API Keys
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    deepseek_api_key: str = ""
 
     # AI Model Configuration
-    ai_model: str = "gpt-4o-mini"  # gpt-4o-mini, gpt-4o, claude-3-5-sonnet-20241022
+    ai_model: str = "gpt-4o-mini"  # gpt-4o-mini, gpt-4o, claude-3-5-sonnet-20241022, deepseek-chat 等
     ai_temperature: float = 0.3
     ai_max_tokens: int = 2000
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
 
     # External API URLs
     rxnorm_api_base: str = "https://rxnav.nlm.nih.gov/REST"
@@ -41,7 +46,15 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-in-production"  # JWT密钥，生产环境必须修改
     access_token_expire_minutes: int = 30
 
-    @field_validator("openai_api_key", "anthropic_api_key")
+    # HTTP客户端配置
+    http_timeout_seconds: float = 30.0
+    http_max_retries: int = 3
+    http_max_connections: int = 100
+
+    # 可选功能开关
+    enable_graphql: bool = True
+
+    @field_validator("openai_api_key", "anthropic_api_key", "deepseek_api_key")
     @classmethod
     def validate_api_keys(cls, v: str, info) -> str:
         """验证API密钥不为默认值"""

@@ -25,34 +25,27 @@ async def ask_medication(query: MedicationQuery):
     - 引导用户咨询医疗专业人员
     - 提供透明的信息来源
     """
-    try:
-        agent = AIAgentService()
-        result = await agent.ask_medication(
-            drug_name=query.drug_name,
-            question=query.question
-        )
+    agent = AIAgentService()
+    result = await agent.ask_medication(
+        drug_name=query.drug_name,
+        question=query.question
+    )
 
-        if not result["success"]:
-            return MedicationResponse(
-                success=False,
-                error=result.get("error", "未知错误"),
-                disclaimer=result.get("disclaimer", "此信息仅供教育用途")
-            )
-
+    if not result["success"]:
         return MedicationResponse(
-            success=True,
-            drug_name=result["drug_name"],
-            question=result["question"],
-            answer=result["answer"],
-            disclaimer=result["disclaimer"],
-            severity=SeverityLevel.INFO
+            success=False,
+            error=result.get("error", "未知错误"),
+            disclaimer=result.get("disclaimer", "此信息仅供教育用途")
         )
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"服务暂时不可用: {str(e)}"
-        )
+    return MedicationResponse(
+        success=True,
+        drug_name=result["drug_name"],
+        question=result["question"],
+        answer=result["answer"],
+        disclaimer=result["disclaimer"],
+        severity=SeverityLevel.INFO
+    )
 
 
 @router.post("/check-interaction", response_model=DrugInteractionResponse, tags=["medication"])
@@ -63,45 +56,38 @@ async def check_drug_interaction(query: DrugInteractionQuery):
     检查两种药物之间的潜在相互作用
     数据来源：FDA药品标签
     """
-    try:
-        agent = AIAgentService()
+    agent = AIAgentService()
 
-        # 验证两种药物
-        validation1 = await agent.validate_drug_input(query.drug1)
-        validation2 = await agent.validate_drug_input(query.drug2)
+    # 验证两种药物
+    validation1 = await agent.validate_drug_input(query.drug1)
+    validation2 = await agent.validate_drug_input(query.drug2)
 
-        if not validation1["valid"]:
-            return DrugInteractionResponse(
-                success=False,
-                error=validation1["error"]
-            )
-
-        if not validation2["valid"]:
-            return DrugInteractionResponse(
-                success=False,
-                error=validation2["error"]
-            )
-
-        # 检查相互作用
-        interaction_result = await agent.check_drug_interactions(
-            drug1=validation1["cleaned_name"],
-            drug2=validation2["cleaned_name"]
-        )
-
+    if not validation1["valid"]:
         return DrugInteractionResponse(
-            success=True,
-            drug1=validation1["cleaned_name"],
-            drug2=validation2["cleaned_name"],
-            found_interactions=interaction_result["found_interactions"],
-            interactions=interaction_result["interactions"],
-            recommendation=interaction_result["recommendation"]
+            success=False,
+            error=validation1["error"]
         )
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"服务暂时不可用: {str(e)}"
+    if not validation2["valid"]:
+        return DrugInteractionResponse(
+            success=False,
+            error=validation2["error"]
         )
+
+    # 检查相互作用
+    interaction_result = await agent.check_drug_interactions(
+        drug1=validation1["cleaned_name"],
+        drug2=validation2["cleaned_name"]
+    )
+
+    return DrugInteractionResponse(
+        success=True,
+        drug1=validation1["cleaned_name"],
+        drug2=validation2["cleaned_name"],
+        found_interactions=interaction_result["found_interactions"],
+        interactions=interaction_result["interactions"],
+        recommendation=interaction_result["recommendation"]
+    )
 
 
 @router.get("/disclaimer", response_model=MedicalDisclaimer, tags=["medication"])
@@ -125,22 +111,15 @@ async def validate_drug(drug_name: str):
     Returns:
         验证结果
     """
-    try:
-        agent = AIAgentService()
-        validation = await agent.validate_drug_input(drug_name)
+    agent = AIAgentService()
+    validation = await agent.validate_drug_input(drug_name)
 
-        return {
-            "valid": validation["valid"],
-            "drug_name": drug_name,
-            "cleaned_name": validation.get("cleaned_name"),
-            "error": validation.get("error")
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"验证服务暂时不可用: {str(e)}"
-        )
+    return {
+        "valid": validation["valid"],
+        "drug_name": drug_name,
+        "cleaned_name": validation.get("cleaned_name"),
+        "error": validation.get("error")
+    }
 
 
 @router.get("/drug-info/{drug_name}", tags=["medication"])
@@ -150,30 +129,21 @@ async def get_drug_info(drug_name: str):
 
     数据来源：RxNorm + OpenFDA
     """
-    try:
-        agent = AIAgentService()
+    agent = AIAgentService()
 
-        # 验证药物
-        validation = await agent.validate_drug_input(drug_name)
+    # 验证药物
+    validation = await agent.validate_drug_input(drug_name)
 
-        if not validation["valid"]:
-            raise HTTPException(status_code=404, detail=validation["error"])
+    if not validation["valid"]:
+        raise HTTPException(status_code=404, detail=validation["error"])
 
-        # 获取RxNorm和FDA信息
-        rxnorm_context = await agent.rxnorm_service.get_drug_context(validation["cleaned_name"])
-        fda_context = await agent.openfda_service.get_drug_context(validation["cleaned_name"])
+    # 获取RxNorm和FDA信息
+    rxnorm_context = await agent.rxnorm_service.get_drug_context(validation["cleaned_name"])
+    fda_context = await agent.openfda_service.get_drug_context(validation["cleaned_name"])
 
-        return {
-            "drug_name": validation["cleaned_name"],
-            "rxnorm": rxnorm_context,
-            "fda": fda_context,
-            "disclaimer": "此信息仅供教育用途，不能替代专业医疗建议"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"服务暂时不可用: {str(e)}"
-        )
+    return {
+        "drug_name": validation["cleaned_name"],
+        "rxnorm": rxnorm_context,
+        "fda": fda_context,
+        "disclaimer": "此信息仅供教育用途，不能替代专业医疗建议"
+    }

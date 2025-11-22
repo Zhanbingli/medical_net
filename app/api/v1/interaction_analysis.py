@@ -34,25 +34,18 @@ async def analyze_drug_interaction_detailed(query: DrugInteractionDetailedQuery)
 
     这是一个增强版本的相互作用分析，提供比基础版本更详细的信息。
     """
-    try:
-        service = DrugInteractionEnhancedService()
+    service = DrugInteractionEnhancedService()
 
-        analysis = await service.analyze_interaction_detailed(
-            drug1=query.drug1,
-            drug2=query.drug2
-        )
+    analysis = await service.analyze_interaction_detailed(
+        drug1=query.drug1,
+        drug2=query.drug2
+    )
 
-        return {
-            "success": True,
-            "data": analysis,
-            "disclaimer": "此分析基于FDA公开数据和AI生成，仅供教育和参考用途。不能替代专业医疗建议。实际用药请咨询医生或药剂师。"
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"分析服务暂时不可用: {str(e)}"
-        )
+    return {
+        "success": True,
+        "data": analysis,
+        "disclaimer": "此分析基于FDA公开数据和AI生成，仅供教育和参考用途。不能替代专业医疗建议。实际用药请咨询医生或药剂师。"
+    }
 
 
 @router.post("/compare-side-effects", tags=["interaction-analysis"])
@@ -66,40 +59,33 @@ async def compare_side_effects(query: DrugInteractionDetailedQuery):
     - 联合使用时新增的副作用
     - 联合使用时风险增加的副作用
     """
-    try:
-        service = DrugInteractionEnhancedService()
+    service = DrugInteractionEnhancedService()
 
-        analysis = await service.analyze_interaction_detailed(
-            drug1=query.drug1,
-            drug2=query.drug2
-        )
+    analysis = await service.analyze_interaction_detailed(
+        drug1=query.drug1,
+        drug2=query.drug2
+    )
 
-        return {
-            "success": True,
-            "comparison": {
-                "drug1_baseline": {
-                    "name": analysis["drug1"]["name"],
-                    "adverse_effects": analysis["drug1"]["baseline_adverse_effects"]
-                },
-                "drug2_baseline": {
-                    "name": analysis["drug2"]["name"],
-                    "adverse_effects": analysis["drug2"]["baseline_adverse_effects"]
-                },
-                "combined_use": {
-                    "new_adverse_effects": analysis["interaction"]["new_adverse_effects"],
-                    "increased_risk_effects": analysis["interaction"]["increased_risk_effects"],
-                    "combined_adverse_effects": analysis["interaction"]["combined_adverse_effects"]
-                }
+    return {
+        "success": True,
+        "comparison": {
+            "drug1_baseline": {
+                "name": analysis["drug1"]["name"],
+                "adverse_effects": analysis["drug1"]["baseline_adverse_effects"]
             },
-            "summary": f"联合使用{query.drug1}和{query.drug2}时，除了各自的副作用外，还可能出现新的副作用或增加某些副作用的风险。",
-            "disclaimer": "此分析基于FDA公开数据，仅供教育用途。"
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"对比服务暂时不可用: {str(e)}"
-        )
+            "drug2_baseline": {
+                "name": analysis["drug2"]["name"],
+                "adverse_effects": analysis["drug2"]["baseline_adverse_effects"]
+            },
+            "combined_use": {
+                "new_adverse_effects": analysis["interaction"]["new_adverse_effects"],
+                "increased_risk_effects": analysis["interaction"]["increased_risk_effects"],
+                "combined_adverse_effects": analysis["interaction"]["combined_adverse_effects"]
+            }
+        },
+        "summary": f"联合使用{query.drug1}和{query.drug2}时，除了各自的副作用外，还可能出现新的副作用或增加某些副作用的风险。",
+        "disclaimer": "此分析基于FDA公开数据，仅供教育用途。"
+    }
 
 
 @router.post("/efficacy-impact", tags=["interaction-analysis"])
@@ -113,43 +99,36 @@ async def analyze_efficacy_impact(query: DrugInteractionDetailedQuery):
     - 详细的影响描述
     - 临床意义
     """
-    try:
-        service = DrugInteractionEnhancedService()
+    service = DrugInteractionEnhancedService()
 
-        analysis = await service.analyze_interaction_detailed(
-            drug1=query.drug1,
-            drug2=query.drug2
-        )
+    analysis = await service.analyze_interaction_detailed(
+        drug1=query.drug1,
+        drug2=query.drug2
+    )
 
-        efficacy_impact = analysis["interaction"]["efficacy_impact"]
+    efficacy_impact = analysis["interaction"]["efficacy_impact"]
 
-        return {
-            "success": True,
-            "efficacy_analysis": {
-                "drug1": {
-                    "name": query.drug1,
-                    "indication": analysis["drug1"]["indications"][:200] + "..." if len(analysis["drug1"]["indications"]) > 200 else analysis["drug1"]["indications"],
-                    "efficacy_impact": efficacy_impact["drug1_efficacy"],
-                    "impact_description": self._describe_efficacy_impact(efficacy_impact["drug1_efficacy"])
-                },
-                "drug2": {
-                    "name": query.drug2,
-                    "indication": analysis["drug2"]["indications"][:200] + "..." if len(analysis["drug2"]["indications"]) > 200 else analysis["drug2"]["indications"],
-                    "efficacy_impact": efficacy_impact["drug2_efficacy"],
-                    "impact_description": self._describe_efficacy_impact(efficacy_impact["drug2_efficacy"])
-                },
-                "overall_description": efficacy_impact["description"],
-                "clinical_significance": analysis["interaction"]["clinical_significance"]
+    return {
+        "success": True,
+        "efficacy_analysis": {
+            "drug1": {
+                "name": query.drug1,
+                "indication": analysis["drug1"]["indications"][:200] + "..." if len(analysis["drug1"]["indications"]) > 200 else analysis["drug1"]["indications"],
+                "efficacy_impact": efficacy_impact["drug1_efficacy"],
+                "impact_description": _describe_efficacy_impact(efficacy_impact["drug1_efficacy"])
             },
-            "recommendations": analysis["interaction"]["management_recommendations"],
-            "disclaimer": "疗效影响分析基于FDA数据和已知药理学，实际效果因人而异。"
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"疗效分析服务暂时不可用: {str(e)}"
-        )
+            "drug2": {
+                "name": query.drug2,
+                "indication": analysis["drug2"]["indications"][:200] + "..." if len(analysis["drug2"]["indications"]) > 200 else analysis["drug2"]["indications"],
+                "efficacy_impact": efficacy_impact["drug2_efficacy"],
+                "impact_description": _describe_efficacy_impact(efficacy_impact["drug2_efficacy"])
+            },
+            "overall_description": efficacy_impact["description"],
+            "clinical_significance": analysis["interaction"]["clinical_significance"]
+        },
+        "recommendations": analysis["interaction"]["management_recommendations"],
+        "disclaimer": "疗效影响分析基于FDA数据和已知药理学，实际效果因人而异。"
+    }
 
 
 def _describe_efficacy_impact(impact_type: str) -> str:

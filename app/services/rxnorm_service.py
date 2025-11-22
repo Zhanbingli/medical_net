@@ -1,10 +1,14 @@
 """RxNorm API服务 - 用于药物标准化命名和查询"""
 
-import httpx
 from typing import Optional, Dict, Any, List
+
 from app.core.config import get_settings
+from app.core.http_client import get_http_client
+from app.core.logging import get_logger
+from app.services.cache_service import CacheStrategy, get_cache_service
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 class RxNormService:
@@ -12,104 +16,92 @@ class RxNormService:
 
     def __init__(self):
         self.base_url = settings.rxnorm_api_base
-        self.timeout = 10.0
+        self.http_client = get_http_client()
+        self.cache = get_cache_service()
 
     async def get_rxcui(self, drug_name: str) -> Optional[str]:
         """
-        通过药物名称获取RxCUI（RxNorm概念唯一标识符）
-
-        Args:
-            drug_name: 药物名称
-
-        Returns:
-            RxCUI字符串，如果未找到返回None
+        通过药物名称获取RxCUI（带缓存和重试）
         """
+        cache_key = f"rxnorm:rxcui:{drug_name.lower()}"
+        cached = await self.cache.get(cache_key)
+        if cached:
+            return cached
+
         url = f"{self.base_url}/rxcui.json"
         params = {"name": drug_name}
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
+            response = await self.http_client.get(url, params=params)
+            data = response.json()
 
-                # 检查是否有结果
-                if "idGroup" in data and "rxnormId" in data["idGroup"]:
-                    rxnorm_ids = data["idGroup"]["rxnormId"]
-                    if rxnorm_ids:
-                        # 返回第一个匹配的RxCUI
-                        return rxnorm_ids[0] if isinstance(rxnorm_ids, list) else rxnorm_ids
+            if "idGroup" in data and "rxnormId" in data["idGroup"]:
+                rxnorm_ids = data["idGroup"]["rxnormId"]
+                if rxnorm_ids:
+                    rxcui = rxnorm_ids[0] if isinstance(rxnorm_ids, list) else rxnorm_ids
+                    await self.cache.set(cache_key, rxcui, CacheStrategy.RXNORM_TTL)
+                    return rxcui
 
-                return None
+            return None
         except Exception as e:
-            print(f"Error fetching RxCUI for {drug_name}: {e}")
+            logger.error("Failed to fetch RxCUI", error=str(e), drug=drug_name)
             return None
 
     async def get_drug_properties(self, rxcui: str) -> Optional[Dict[str, Any]]:
         """
         获取药物的详细属性
-
-        Args:
-            rxcui: RxNorm概念唯一标识符
-
-        Returns:
-            包含药物属性的字典
         """
+        cache_key = f"rxnorm:properties:{rxcui}"
+        cached = await self.cache.get(cache_key)
+        if cached:
+            return cached
+
         url = f"{self.base_url}/rxcui/{rxcui}/properties.json"
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url)
-                response.raise_for_status()
-                data = response.json()
+            response = await self.http_client.get(url)
+            data = response.json()
 
-                if "properties" in data:
-                    return data["properties"]
+            if "properties" in data:
+                await self.cache.set(cache_key, data["properties"], CacheStrategy.RXNORM_TTL)
+                return data["properties"]
 
-                return None
+            return None
         except Exception as e:
-            print(f"Error fetching drug properties for RxCUI {rxcui}: {e}")
+            logger.error("Failed to fetch drug properties", error=str(e), rxcui=rxcui)
             return None
 
     async def get_related_drugs(self, rxcui: str) -> List[Dict[str, Any]]:
         """
         获取相关药物（如通用名、品牌名等）
-
-        Args:
-            rxcui: RxNorm概念唯一标识符
-
-        Returns:
-            相关药物列表
         """
+        cache_key = f"rxnorm:related:{rxcui}"
+        cached = await self.cache.get(cache_key)
+        if cached:
+            return cached
+
         url = f"{self.base_url}/rxcui/{rxcui}/related.json"
         params = {"tty": "SBD+SBDC+SCD+SCDC+BPCK+GPCK"}  # 各种药物类型
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
+            response = await self.http_client.get(url, params=params)
+            data = response.json()
 
-                related = []
-                if "relatedGroup" in data and "conceptGroup" in data["relatedGroup"]:
-                    for group in data["relatedGroup"]["conceptGroup"]:
-                        if "conceptProperties" in group:
-                            related.extend(group["conceptProperties"])
+            related: List[Dict[str, Any]] = []
+            if "relatedGroup" in data and "conceptGroup" in data["relatedGroup"]:
+                for group in data["relatedGroup"]["conceptGroup"]:
+                    if "conceptProperties" in group:
+                        related.extend(group["conceptProperties"])
 
-                return related
+            await self.cache.set(cache_key, related, CacheStrategy.RXNORM_TTL)
+            return related
         except Exception as e:
-            print(f"Error fetching related drugs for RxCUI {rxcui}: {e}")
+            logger.error("Failed to fetch related drugs", error=str(e), rxcui=rxcui)
             return []
 
     async def validate_drug_name(self, drug_name: str) -> bool:
         """
         验证药物名称是否在RxNorm中存在
-
-        Args:
-            drug_name: 药物名称
-
-        Returns:
-            True如果药物存在，False否则
         """
         rxcui = await self.get_rxcui(drug_name)
         return rxcui is not None
@@ -117,12 +109,6 @@ class RxNormService:
     async def get_drug_context(self, drug_name: str) -> Dict[str, Any]:
         """
         获取药物的完整上下文信息（用于AI处理）
-
-        Args:
-            drug_name: 药物名称
-
-        Returns:
-            包含药物详细信息的字典
         """
         rxcui = await self.get_rxcui(drug_name)
 
@@ -130,10 +116,9 @@ class RxNormService:
             return {
                 "found": False,
                 "drug_name": drug_name,
-                "error": "Drug not found in RxNorm database"
+                "error": "Drug not found in RxNorm database",
             }
 
-        # 获取药物属性
         properties = await self.get_drug_properties(rxcui)
         related = await self.get_related_drugs(rxcui)
 
@@ -142,5 +127,5 @@ class RxNormService:
             "drug_name": drug_name,
             "rxcui": rxcui,
             "properties": properties,
-            "related_drugs": related
+            "related_drugs": related,
         }

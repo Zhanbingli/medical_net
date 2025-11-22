@@ -47,6 +47,16 @@ function App() {
 
   const suggestionLoading = normalizedTerm.length >= 2 ? searchLoading : catalogLoading;
 
+  useEffect(() => {
+    if (!catalog || catalog.length === 0) return;
+    const first = catalog[0];
+    // 如果当前选中的药物不存在于目录中，默认选中第一条，避免空白界面
+    if (!selectedDrugId || !catalog.some((item) => item.id === selectedDrugId)) {
+      setSelectedDrugId(first.id);
+      setSearchTerm(first.name);
+    }
+  }, [catalog, selectedDrugId]);
+
   const handleSelect = (drug: DrugSummary) => {
     setSelectedDrugId(drug.id);
     setSearchTerm(drug.name);

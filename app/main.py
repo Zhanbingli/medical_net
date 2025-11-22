@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette_graphene3 import GraphQLApp
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -18,15 +17,31 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.exceptions import register_exception_handlers
 from app.db import session as db_session
-from app.graphql_api.schema import schema
 from app.services.cache_service import get_cache_service
 from app.core.http_client import close_http_client
 
 settings = get_settings()
 logger = get_logger(__name__)
 
-# 速率限制器
-limiter = Limiter(key_func=get_remote_address)
+# 速率限制器（可配置）
+if settings.rate_limit_enabled:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=[
+            f"{settings.rate_limit_per_minute}/minute",
+            f"{settings.rate_limit_per_hour}/hour",
+        ],
+    )
+else:
+    # 保持接口一致的空实现
+    class _NoopLimiter:
+        def limit(self, *_args, **_kwargs):
+            def decorator(func):
+                return func
+
+            return decorator
+
+    limiter = _NoopLimiter()
 
 
 @asynccontextmanager
@@ -76,8 +91,9 @@ app = FastAPI(
 register_exception_handlers(app)
 
 # 添加速率限制器
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+if settings.rate_limit_enabled:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS配置 - 使用白名单而非 "*"
 app.add_middleware(
@@ -113,7 +129,7 @@ async def add_db_to_context(request: Request, call_next):
 
 
 @app.get("/health", tags=["health"])
-@limiter.limit("10/minute")  # 健康检查也限流，防止滥用
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")  # 健康检查也限流，防止滥用
 async def health_check(request: Request, db: Session = Depends(get_db_session)):
     """
     健康检查端点
@@ -139,11 +155,16 @@ async def health_check(request: Request, db: Session = Depends(get_db_session)):
 
 
 app.include_router(api_router, prefix=settings.api_prefix)
-app.add_route(
-    settings.graphql_path,
-    GraphQLApp(
-        schema=schema,
-        context_value=lambda request: {"db": request.state.db},
-        on_get=True,
-    ),
-)
+if settings.enable_graphql:
+    # 延迟导入以便可配置关闭 GraphQL
+    from starlette_graphene3 import GraphQLApp
+    from app.graphql_api.schema import schema
+
+    app.add_route(
+        settings.graphql_path,
+        GraphQLApp(
+            schema=schema,
+            context_value=lambda request: {"db": request.state.db},
+            on_get=True,
+        ),
+    )

@@ -1,10 +1,14 @@
 """OpenFDA API服务 - 用于获取FDA药品标签、警告和不良事件信息"""
 
-import httpx
 from typing import Optional, Dict, Any, List
+
 from app.core.config import get_settings
+from app.core.http_client import get_http_client
+from app.core.logging import get_logger
+from app.services.cache_service import CacheStrategy, get_cache_service
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 class OpenFDAService:
@@ -12,52 +16,45 @@ class OpenFDAService:
 
     def __init__(self):
         self.base_url = settings.openfda_api_base
-        self.timeout = 15.0
+        self.http_client = get_http_client()
+        self.cache = get_cache_service()
 
     async def get_drug_label(self, drug_name: str) -> Optional[Dict[str, Any]]:
         """
-        获取FDA批准的药品标签信息
-
-        Args:
-            drug_name: 药物名称（品牌名或通用名）
-
-        Returns:
-            包含药品标签信息的字典
+        获取FDA批准的药品标签信息（带缓存与重试）
         """
+        cache_key = f"openfda:label:{drug_name.lower()}"
+        cached = await self.cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         url = f"{self.base_url}/drug/label.json"
         params = {
             "search": f"openfda.brand_name:{drug_name} OR openfda.generic_name:{drug_name}",
-            "limit": 1
+            "limit": 1,
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
+            response = await self.http_client.get(url, params=params)
+            data = response.json()
 
-                if "results" in data and len(data["results"]) > 0:
-                    return data["results"][0]
+            if "results" in data and len(data["results"]) > 0:
+                label = data["results"][0]
+                await self.cache.set(cache_key, label, CacheStrategy.OPENFDA_TTL)
+                return label
 
-                return None
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                return None
-            print(f"HTTP error fetching drug label for {drug_name}: {e}")
             return None
         except Exception as e:
-            print(f"Error fetching drug label for {drug_name}: {e}")
+            logger.error(
+                "Failed to fetch FDA label",
+                error=str(e),
+                drug=drug_name,
+            )
             return None
 
     async def get_warnings_and_precautions(self, drug_name: str) -> Dict[str, Any]:
         """
         获取药物的警告和注意事项
-
-        Args:
-            drug_name: 药物名称
-
-        Returns:
-            包含警告、注意事项和禁忌症的字典
         """
         label = await self.get_drug_label(drug_name)
 
@@ -67,7 +64,7 @@ class OpenFDAService:
                 "drug_name": drug_name,
                 "warnings": [],
                 "precautions": [],
-                "contraindications": []
+                "contraindications": [],
             }
 
         # 提取相关字段
@@ -81,55 +78,41 @@ class OpenFDAService:
             "drug_name": drug_name,
             "warnings": warnings if isinstance(warnings, list) else [warnings],
             "precautions": precautions if isinstance(precautions, list) else [precautions],
-            "contraindications": contraindications if isinstance(contraindications, list) else [contraindications],
-            "boxed_warning": boxed_warning if isinstance(boxed_warning, list) else [boxed_warning]
+            "contraindications": contraindications
+            if isinstance(contraindications, list)
+            else [contraindications],
+            "boxed_warning": boxed_warning if isinstance(boxed_warning, list) else [boxed_warning],
         }
 
     async def get_adverse_events(self, drug_name: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         获取药物不良事件报告（FAERS数据）
-
-        Args:
-            drug_name: 药物名称
-            limit: 返回结果数量限制
-
-        Returns:
-            不良事件列表
         """
         url = f"{self.base_url}/drug/event.json"
         params = {
             "search": f"patient.drug.openfda.brand_name:{drug_name}",
-            "limit": limit
+            "limit": limit,
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
+            response = await self.http_client.get(url, params=params)
+            data = response.json()
 
-                if "results" in data:
-                    return data["results"]
+            if "results" in data:
+                return data["results"]
 
-                return []
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                return []
-            print(f"HTTP error fetching adverse events for {drug_name}: {e}")
             return []
         except Exception as e:
-            print(f"Error fetching adverse events for {drug_name}: {e}")
+            logger.error(
+                "Failed to fetch adverse events",
+                error=str(e),
+                drug=drug_name,
+            )
             return []
 
     async def get_drug_context(self, drug_name: str) -> Dict[str, Any]:
         """
         获取药物的完整FDA上下文信息（用于AI处理）
-
-        Args:
-            drug_name: 药物名称
-
-        Returns:
-            包含FDA官方信息的字典
         """
         label = await self.get_drug_label(drug_name)
 
@@ -137,7 +120,7 @@ class OpenFDAService:
             return {
                 "found": False,
                 "drug_name": drug_name,
-                "error": "Drug not found in FDA database"
+                "error": "Drug not found in FDA database",
             }
 
         # 提取关键信息
@@ -173,18 +156,14 @@ class OpenFDAService:
             "adverse_reactions": adverse_reactions_text,
             "dosage": dosage_text,
             "openfda": label.get("openfda", {}),
-            "manufacturer": label.get("openfda", {}).get("manufacturer_name", ["未知制造商"])[0] if label.get("openfda", {}).get("manufacturer_name") else "未知制造商"
+            "manufacturer": label.get("openfda", {}).get("manufacturer_name", ["未知制造商"])[0]
+            if label.get("openfda", {}).get("manufacturer_name")
+            else "未知制造商",
         }
 
     async def check_drug_interactions_fda(self, drug_name: str) -> List[str]:
         """
         从FDA标签中提取药物相互作用信息
-
-        Args:
-            drug_name: 药物名称
-
-        Returns:
-            药物相互作用列表
         """
         label = await self.get_drug_label(drug_name)
 
@@ -195,7 +174,6 @@ class OpenFDAService:
 
         if isinstance(drug_interactions, list):
             return drug_interactions
-        elif isinstance(drug_interactions, str):
+        if isinstance(drug_interactions, str):
             return [drug_interactions]
-        else:
-            return []
+        return []

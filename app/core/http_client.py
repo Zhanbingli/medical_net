@@ -4,20 +4,31 @@ HTTP客户端 - 带重试机制和超时控制的HTTP客户端
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, Optional
 import httpx
 from tenacity import (
-    retry,
+    AsyncRetrying,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
+    retry_if_exception,
     before_sleep_log,
     after_log,
 )
 import logging
 
+from app.core.config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+def _should_retry(exc: BaseException) -> bool:
+    """判定是否需要重试"""
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
+        return exc.response.status_code >= 500
+    return False
 
 
 class ResilientHTTPClient:
@@ -48,7 +59,6 @@ class ResilientHTTPClient:
         self.timeout = timeout
         self.max_retries = max_retries
 
-        # 创建HTTP客户端配置
         self.limits = httpx.Limits(
             max_keepalive_connections=max_connections,
             max_connections=max_connections,
@@ -64,7 +74,7 @@ class ResilientHTTPClient:
                 timeout=httpx.Timeout(self.timeout),
                 limits=self.limits,
                 follow_redirects=True,
-                http2=True,  # 启用HTTP/2支持
+                http2=True,
             )
         return self._client
 
@@ -73,17 +83,43 @@ class ResilientHTTPClient:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((
-            httpx.TimeoutException,
-            httpx.ConnectError,
-            httpx.NetworkError,
-        )),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        after=after_log(logger, logging.INFO),
-    )
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> httpx.Response:
+        """统一请求入口，使用可配置的重试次数"""
+        client = await self.get_client()
+
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(self.max_retries),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception(_should_retry),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            after=after_log(logger, logging.INFO),
+            reraise=True,
+        ):
+            with attempt:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    params=params,
+                    headers=headers,
+                    data=data,
+                    json=json,
+                    **kwargs,
+                )
+
+                if response.status_code >= 400:
+                    response.raise_for_status()
+
+                return response
+
     async def get(
         self,
         url: str,
@@ -91,57 +127,18 @@ class ResilientHTTPClient:
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ) -> httpx.Response:
-        """
-        发送GET请求（带重试）
-
-        Args:
-            url: 请求URL
-            params: 查询参数
-            headers: 请求头
-            **kwargs: 其他参数
-
-        Returns:
-            HTTP响应对象
-
-        Raises:
-            httpx.HTTPError: HTTP错误
-        """
-        client = await self.get_client()
-
+        """发送GET请求（带重试）"""
         try:
-            response = await client.get(
-                url,
-                params=params,
-                headers=headers,
-                **kwargs,
+            return await self._request(
+                "GET", url, params=params, headers=headers, **kwargs
             )
-            response.raise_for_status()
-            return response
-
         except httpx.HTTPStatusError as e:
-            # 对于4xx错误，不重试
             if 400 <= e.response.status_code < 500:
-                logger.warning(
-                    f"Client error {e.response.status_code} for URL: {url}"
-                )
+                logger.warning("Client error for GET", status=e.response.status_code, url=url)
                 raise
-            # 对于5xx错误，让重试机制处理
-            logger.error(
-                f"Server error {e.response.status_code} for URL: {url}"
-            )
+            logger.error("Server error for GET", status=e.response.status_code, url=url)
             raise
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((
-            httpx.TimeoutException,
-            httpx.ConnectError,
-            httpx.NetworkError,
-        )),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        after=after_log(logger, logging.INFO),
-    )
     async def post(
         self,
         url: str,
@@ -150,44 +147,21 @@ class ResilientHTTPClient:
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ) -> httpx.Response:
-        """
-        发送POST请求（带重试）
-
-        Args:
-            url: 请求URL
-            data: 表单数据
-            json: JSON数据
-            headers: 请求头
-            **kwargs: 其他参数
-
-        Returns:
-            HTTP响应对象
-
-        Raises:
-            httpx.HTTPError: HTTP错误
-        """
-        client = await self.get_client()
-
+        """发送POST请求（带重试）"""
         try:
-            response = await client.post(
+            return await self._request(
+                "POST",
                 url,
                 data=data,
                 json=json,
                 headers=headers,
                 **kwargs,
             )
-            response.raise_for_status()
-            return response
-
         except httpx.HTTPStatusError as e:
             if 400 <= e.response.status_code < 500:
-                logger.warning(
-                    f"Client error {e.response.status_code} for URL: {url}"
-                )
+                logger.warning("Client error for POST", status=e.response.status_code, url=url)
                 raise
-            logger.error(
-                f"Server error {e.response.status_code} for URL: {url}"
-            )
+            logger.error("Server error for POST", status=e.response.status_code, url=url)
             raise
 
     async def get_json(
@@ -197,18 +171,7 @@ class ResilientHTTPClient:
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """
-        发送GET请求并返回JSON
-
-        Args:
-            url: 请求URL
-            params: 查询参数
-            headers: 请求头
-            **kwargs: 其他参数
-
-        Returns:
-            解析后的JSON数据
-        """
+        """发送GET请求并返回JSON"""
         response = await self.get(url, params=params, headers=headers, **kwargs)
         return response.json()
 
@@ -220,26 +183,13 @@ class ResilientHTTPClient:
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """
-        发送POST请求并返回JSON
-
-        Args:
-            url: 请求URL
-            data: 表单数据
-            json: JSON数据
-            headers: 请求头
-            **kwargs: 其他参数
-
-        Returns:
-            解析后的JSON数据
-        """
+        """发送POST请求并返回JSON"""
         response = await self.post(
             url, data=data, json=json, headers=headers, **kwargs
         )
         return response.json()
 
 
-# 全局HTTP客户端实例
 _http_client: Optional[ResilientHTTPClient] = None
 
 
@@ -248,9 +198,9 @@ def get_http_client() -> ResilientHTTPClient:
     global _http_client
     if _http_client is None:
         _http_client = ResilientHTTPClient(
-            timeout=30.0,
-            max_retries=3,
-            max_connections=100,
+            timeout=settings.http_timeout_seconds,
+            max_retries=settings.http_max_retries,
+            max_connections=settings.http_max_connections,
         )
     return _http_client
 

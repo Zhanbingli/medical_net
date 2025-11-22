@@ -65,6 +65,8 @@ class StructuredLogger:
 
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
+        # 禁止向父logger传播，避免重复输出
+        self.logger.propagate = False
 
     def _build_log_dict(
         self,
