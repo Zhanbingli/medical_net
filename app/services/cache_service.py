@@ -11,8 +11,10 @@ from functools import wraps
 import redis.asyncio as aioredis
 
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 class CacheService:
@@ -74,8 +76,8 @@ class CacheService:
             if data:
                 return json.loads(data)
             return None
-        except Exception as e:
-            print(f"缓存读取错误: {e}")
+        except Exception:
+            logger.exception("Cache read error", cache_key=key)
             return None
 
     async def set(
@@ -97,8 +99,8 @@ class CacheService:
             serialized = json.dumps(value, default=str)
             await redis.setex(key, ttl, serialized)
             return True
-        except Exception as e:
-            print(f"缓存写入错误: {e}")
+        except Exception:
+            logger.exception("Cache write error", cache_key=key, ttl=ttl)
             return False
 
     async def delete(self, key: str) -> bool:
@@ -115,8 +117,8 @@ class CacheService:
         try:
             await redis.delete(key)
             return True
-        except Exception as e:
-            print(f"缓存删除错误: {e}")
+        except Exception:
+            logger.exception("Cache delete error", cache_key=key)
             return False
 
     async def delete_pattern(self, pattern: str) -> int:
@@ -138,8 +140,8 @@ class CacheService:
             if keys:
                 return await redis.delete(*keys)
             return 0
-        except Exception as e:
-            print(f"批量删除缓存错误: {e}")
+        except Exception:
+            logger.exception("Cache pattern delete error", pattern=pattern)
             return 0
 
     def cached(

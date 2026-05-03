@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from typing import Generator
+from fastapi import Request
+from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 
+def get_db_session(request: Request) -> Session:
+    """Return the per-request DB session created by the middleware in app.main.
 
-def get_db_session() -> Generator:
-    yield from get_db()
+    The middleware owns the session lifecycle (open on entry, close on exit),
+    so this dependency simply hands the session to route handlers. Both
+    REST endpoints and the GraphQL context share this single session.
+    """
+    return request.state.db

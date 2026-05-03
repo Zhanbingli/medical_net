@@ -1,14 +1,17 @@
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 .env
+.env.*
 
 # Node
 node_modules/
 npm-debug.log
 dist/
 build/
+frontend/dist/
 
 # Editors / OS
 .DS_Store
@@ -16,9 +19,17 @@ build/
 .vscode/
 
 # Tests / tooling caches
+tests/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+coverage/
+.coverage
+
+# VCS & docs (not needed in image)
+.git/
+.gitignore
+*.md
 
 # AI/IDE metadata
 .claude/
