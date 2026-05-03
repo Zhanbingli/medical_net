@@ -14,7 +14,9 @@ build/
 frontend/dist/
 
 # Data & coverage artifacts
-data/
+# data/ 整体不再被忽略 - data/seed/ 是策划过的种子数据需要入库; 临时文件请放 data/tmp/
+data/tmp/
+data/cache/
 coverage/
 coverage*
 .coverage

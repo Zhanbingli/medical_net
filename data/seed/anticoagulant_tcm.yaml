@@ -1,0 +1,755 @@
+# =============================================================================
+# 心血管抗凝/抗血小板药物 × 中药 互作种子数据
+# Phase 1 范围: 30 条高频/高风险互作, 用于初始化知识图谱
+# =============================================================================
+#
+# 字段说明:
+#   severity:        major | moderate | minor | theoretical
+#   direction:       increase (西药效应增强) | decrease | variable
+#   evidence_level:  A (RCT/meta) | B (单 RCT 或多 case-control) |
+#                    C (病例系列) | D (单病例 / 仅 PK / 仅体外动物)
+#   documentation:   established | probable | suspected | theoretical
+#
+# 重要提醒 (curator 须知):
+#   - 本文件作为 seed, 每条都需在临床使用前核对原文
+#   - evidence_keywords 是检索提示, 非完整引用; 经核对后填入 evidence.pmid/doi
+#   - "established" 标签仅给国际通用药典/指南/FDA 标签明确警示的条目
+#   - 中药剂量/剂型差异显著影响互作强度, 临床建议须结合具体方剂使用
+# =============================================================================
+
+interactions:
+
+  # ---------------------------------------------------------------------------
+  # 华法林 (Warfarin) 系列 - 治疗指数最窄, 出事最多
+  # ---------------------------------------------------------------------------
+
+  - id: "INT-WF-DS-001"
+    drug:
+      id: "DRUG-WARFARIN"
+      name_cn: "华法林"
+      name_en: "Warfarin"
+      atc_code: "B01AA03"
+      drug_class: "Vitamin K antagonist"
+      therapeutic_index: "narrow"
+    herb:
+      id: "HERB-DANSHEN"
+      name_cn: "丹参"
+      name_pinyin: "danshen"
+      name_latin: "Salvia miltiorrhiza"
+      parts_used: ["root", "rhizome"]
+    severity: major
+    direction: increase
+    documentation: established
+    evidence_level: B
+    onset: delayed
+    effect_cn: "INR 显著升高, 皮下/消化道/颅内出血风险增加"
+    mechanism_summary_cn: |
+      多机制叠加:
+      (1) 丹参酮 IIA 抑制 CYP2C9, 减少 S-华法林代谢
+      (2) 丹参素及其他水溶性成分独立抗凝/抗血小板
+      (3) 蛋白结合置换效应 (与白蛋白结合, 升高游离华法林)
+    mechanisms:
+      - { type: enzyme, target: "CYP2C9", detail: "中等度抑制" }
+      - { type: pathway, target: "platelet_aggregation", detail: "独立抑制" }
+      - { type: pathway, target: "coagulation_cascade" }
+    clinical_action: "避免合用. 已合用者立即检测 INR, 1-2 周内复测; 出血时停用并补充维生素 K1."
+    monitoring: ["INR", "皮下瘀斑", "黑便", "头痛/神经症状"]
+    high_risk_groups: ["老年", "肝功能不全", "INR 不稳定", "CYP2C9 *2/*3 携带者"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Yu CM Aust N Z J Med 1997 warfarin danshen INR"
+        summary_cn: "62 岁女性 INR 8.4 + 皮下血肿"
+      - source_type: case_report
+        evidence_keywords: "Tam LS Aust N Z J Med 1995 danshen warfarin"
+      - source_type: pk_study
+        evidence_keywords: "Lo AC danshen warfarin pharmacokinetic rat 1992"
+    notes: "国内冠心病合并房颤患者常并用, 复方丹参滴丸尤其常见, 临床盲区."
+
+  - id: "INT-WF-FFDS-002"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    formula:
+      id: "FORMULA-FUFANG-DANSHEN"
+      name_cn: "复方丹参滴丸"
+      composition_text: "丹参、三七、冰片"
+      composition_herbs: ["HERB-DANSHEN", "HERB-SANQI", "HERB-BINGPIAN"]
+    severity: major
+    direction: increase
+    documentation: probable
+    evidence_level: B
+    effect_cn: "出血风险显著增加 (丹参 + 三七 双重抗凝叠加)"
+    mechanism_summary_cn: "丹参 (CYP2C9 抑制 + 抗血小板) 与三七 (抗凝活血) 双成分叠加效应."
+    clinical_action: "避免合用. 国内冠心病合并华法林适应证 (如机械瓣膜) 患者必须明确告知禁用."
+    monitoring: ["INR", "出血体征"]
+    high_risk_groups: ["机械瓣膜置换术后", "老年"]
+    evidences:
+      - source_type: review
+        evidence_keywords: "复方丹参滴丸 华法林 互作 综述"
+    notes: "中国心内科最高频的中西药互作之一, 必须放在 alert 头部."
+
+  - id: "INT-WF-GINKGO-003"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-GINKGO"
+      name_cn: "银杏叶"
+      name_pinyin: "yinxingye"
+      name_latin: "Ginkgo biloba"
+      parts_used: ["leaf"]
+    severity: moderate
+    direction: increase
+    documentation: established
+    evidence_level: B
+    effect_cn: "出血风险增加, 已有自发性硬膜下/视网膜出血病例"
+    mechanism_summary_cn: |
+      银杏内酯 B (ginkgolide B) 是血小板活化因子 (PAF) 拮抗剂, 抑制血小板聚集.
+      多数 PK 研究未发现对华法林代谢 (CYP2C9) 的显著影响, 主要为药效学叠加.
+    mechanisms:
+      - { type: target, target: "PAF_receptor", detail: "ginkgolide B 拮抗" }
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免银杏补充剂. 无银杏适应证患者建议停用; 必要时改用其他药物."
+    monitoring: ["INR (尽管多无显著变化)", "出血体征", "瘀斑", "眼底/神经症状"]
+    high_risk_groups: ["老年", "联用其他抗血小板药"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Matthews MK Neurology 1998 ginkgo subdural hematoma"
+      - source_type: pk_study
+        evidence_keywords: "Jiang X Br J Clin Pharmacol 2005 ginkgo warfarin"
+
+  - id: "INT-WF-DONGQUAI-004"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-DANGGUI"
+      name_cn: "当归"
+      name_pinyin: "danggui"
+      name_latin: "Angelica sinensis"
+      parts_used: ["root"]
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "INR 升高 (报告中可达 4.0+), 瘀斑/出血"
+    mechanism_summary_cn: "当归含香豆素衍生物 (psoralen, bergapten, 阿魏酸); 动物模型显示延长 PT, 推测 CYP2C9 抑制及独立抗凝活性."
+    mechanisms:
+      - { type: enzyme, target: "CYP2C9", detail: "推测抑制" }
+      - { type: pathway, target: "coagulation_cascade" }
+    clinical_action: "避免合用; 妇科常见以当归调经/补血, 需排查华法林适应证."
+    monitoring: ["INR", "出血体征"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Page RL Pharmacotherapy 1999 dong quai warfarin INR"
+      - source_type: preclinical
+        evidence_keywords: "Lo AC danggui warfarin rat pharmacokinetic"
+
+  - id: "INT-WF-RENSHEN-005"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-RENSHEN"
+      name_cn: "人参"
+      name_pinyin: "renshen"
+      name_latin: "Panax ginseng"
+      parts_used: ["root"]
+    severity: moderate
+    direction: variable
+    documentation: probable
+    evidence_level: B
+    effect_cn: "多数报告 INR 降低, 抗凝失效; 个别病例报告 INR 升高 (个体差异大)"
+    mechanism_summary_cn: |
+      可能诱导 CYP2C9/CYP3A4 加速华法林清除 (主流机制).
+      但人参皂苷亦有独立抗血小板活性, 故部分个体表现为出血.
+      双向效应使其成为 'variable' 而非单纯 increase/decrease.
+    mechanisms:
+      - { type: enzyme, target: "CYP2C9", detail: "可能诱导" }
+      - { type: pathway, target: "platelet_aggregation", detail: "弱抑制" }
+    clinical_action: "避免合用. 已合用者监测 INR; 开始或停用人参时尤需复测."
+    monitoring: ["INR (开始/停用人参时密切监测)"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Janetzky K Am J Health Syst Pharm 1997 ginseng warfarin"
+      - source_type: rct
+        evidence_keywords: "Yuan CS Ann Intern Med 2004 ginseng warfarin RCT"
+
+  - id: "INT-WF-AMGINSENG-006"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-XIYANGSHEN"
+      name_cn: "西洋参"
+      name_pinyin: "xiyangshen"
+      name_latin: "Panax quinquefolius"
+      parts_used: ["root"]
+    severity: moderate
+    direction: decrease
+    documentation: established
+    evidence_level: B
+    effect_cn: "INR 降低, 抗凝失效风险"
+    mechanism_summary_cn: "Yuan 2004 RCT 显示西洋参 1g BID × 3 周显著降低华法林 AUC 与 INR; 机制推测为 CYP 诱导."
+    mechanisms:
+      - { type: enzyme, target: "CYP2C9", detail: "诱导" }
+    clinical_action: "避免合用. 已合用者增加 INR 监测频率."
+    monitoring: ["INR"]
+    evidences:
+      - source_type: rct
+        evidence_keywords: "Yuan CS Ann Intern Med 2004 American ginseng warfarin"
+
+  - id: "INT-WF-DASUAN-007"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-DASUAN"
+      name_cn: "大蒜"
+      name_pinyin: "dasuan"
+      name_latin: "Allium sativum"
+      parts_used: ["bulb"]
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加 (大剂量大蒜补充剂)"
+    mechanism_summary_cn: "大蒜素 (allicin) 及含硫化合物抑制血小板聚集; 部分研究示对 CYP 影响弱."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "饮食中适量大蒜可继续; 避免大蒜油/大蒜素补充剂."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Sunter WH Pharm J 1991 garlic warfarin"
+      - source_type: review
+        evidence_keywords: "Borrelli F Mol Nutr Food Res 2007 garlic anticoagulant"
+
+  - id: "INT-WF-SHENGJIANG-008"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-SHENGJIANG"
+      name_cn: "生姜"
+      name_pinyin: "shengjiang"
+      name_latin: "Zingiber officinale"
+      parts_used: ["rhizome"]
+    severity: minor
+    direction: increase
+    documentation: suspected
+    evidence_level: D
+    effect_cn: "理论性出血风险 (大剂量补充剂)"
+    mechanism_summary_cn: "姜辣素抑制血栓素 A2 合成酶, 体外抑制血小板聚集. 临床数据有限, 食用量影响轻微."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "饮食量无须避忌; 避免大剂量姜补充剂."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "Srivastava KC ginger thromboxane platelet"
+      - source_type: case_report
+        evidence_keywords: "Krüth P ginger warfarin INR case report"
+
+  - id: "INT-WF-CHUANXIONG-009"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-CHUANXIONG"
+      name_cn: "川芎"
+      name_pinyin: "chuanxiong"
+      name_latin: "Ligusticum chuanxiong"
+      parts_used: ["rhizome"]
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加, 部分报告 INR 升高"
+    mechanism_summary_cn: "川芎嗪 (tetramethylpyrazine) 与阿魏酸抑制血小板聚集; 动物研究示影响 CYP."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+      - { type: enzyme, target: "CYP2C9", detail: "弱抑制 (动物)" }
+    clinical_action: "避免合用. 川芎广泛用于活血化瘀方剂, 处方时主动询问."
+    monitoring: ["INR", "出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "ligustrazine tetramethylpyrazine platelet aggregation warfarin"
+
+  - id: "INT-WF-HONGHUA-010"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-HONGHUA"
+      name_cn: "红花"
+      name_pinyin: "honghua"
+      name_latin: "Carthamus tinctorius"
+      parts_used: ["flower"]
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加"
+    mechanism_summary_cn: "羟基红花黄色素 A (HSYA) 抑制血小板聚集, 影响 ADP 通路; 体外有抗凝活性."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免合用 (含红花注射液/口服方剂均需警惕)."
+    monitoring: ["INR", "出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "hydroxysafflor yellow A platelet anticoagulant"
+
+  - id: "INT-WF-SANQI-011"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-SANQI"
+      name_cn: "三七"
+      name_pinyin: "sanqi"
+      name_latin: "Panax notoginseng"
+      parts_used: ["root"]
+    severity: moderate
+    direction: variable
+    documentation: probable
+    evidence_level: C
+    effect_cn: "复杂双向效应; 多数临床报告 INR 升高/出血, 但传统用法亦有止血作用"
+    mechanism_summary_cn: |
+      三七总皂苷 (PNS) 兼具止血 (低剂量) 与抗凝活血 (高剂量) 双向作用.
+      与华法林合用时主流报告为出血风险增加, 推测 PD 协同 + CYP 影响.
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+      - { type: pathway, target: "coagulation_cascade", detail: "双向" }
+    clinical_action: "避免合用. 国内 '复方丹参滴丸' 含三七, 需作为整体方剂评估."
+    monitoring: ["INR", "出血体征"]
+    evidences:
+      - source_type: review
+        evidence_keywords: "Panax notoginseng warfarin interaction review"
+
+  - id: "INT-WF-SJW-012"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-GUANYE-LIANQIAO"
+      name_cn: "贯叶连翘 (圣约翰草)"
+      name_pinyin: "guanyelianqiao"
+      name_latin: "Hypericum perforatum"
+      parts_used: ["aerial parts"]
+    severity: major
+    direction: decrease
+    documentation: established
+    evidence_level: A
+    effect_cn: "INR 显著降低, 抗凝失效, 血栓栓塞风险"
+    mechanism_summary_cn: "贯叶金丝桃素 (hyperforin) 是 PXR 强激动剂, 显著诱导 CYP3A4 与 CYP2C9, 加速华法林代谢."
+    mechanisms:
+      - { type: enzyme, target: "CYP2C9", detail: "强诱导" }
+      - { type: enzyme, target: "CYP3A4", detail: "强诱导" }
+    clinical_action: "禁忌合用. FDA / EMA / 国内说明书均明确警示."
+    monitoring: ["INR (停用 SJW 后 1-2 周仍可能持续诱导效应)"]
+    evidences:
+      - source_type: rct
+        evidence_keywords: "Jiang X Br J Clin Pharmacol 2004 St John wort warfarin RCT"
+      - source_type: monograph
+        evidence_keywords: "FDA warning St John wort drug interaction"
+    notes: "国内中成药亦有含贯叶连翘成分, 处方时需注意成份表."
+
+  - id: "INT-WF-GOUQI-013"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-GOUQI"
+      name_cn: "枸杞"
+      name_pinyin: "gouqi"
+      name_latin: "Lycium barbarum"
+      parts_used: ["fruit"]
+    severity: moderate
+    direction: increase
+    documentation: suspected
+    evidence_level: D
+    effect_cn: "INR 显著升高 (个别病例 INR > 4)"
+    mechanism_summary_cn: "推测枸杞活性成分抑制 CYP2C9; 临床证据为个别病例报告."
+    mechanisms:
+      - { type: enzyme, target: "CYP2C9", detail: "推测抑制" }
+    clinical_action: "饮食量小杯枸杞茶/泡水通常无显著影响; 避免大量枸杞 (如每日 > 30g) 或含枸杞口服液."
+    monitoring: ["INR"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Lam AY Ann Pharmacother 2001 Lycium barbarum warfarin"
+      - source_type: case_report
+        evidence_keywords: "Leung H Ann Pharmacother 2008 goji warfarin"
+
+  - id: "INT-WF-JIANGHUANG-014"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-JIANGHUANG"
+      name_cn: "姜黄"
+      name_pinyin: "jianghuang"
+      name_latin: "Curcuma longa"
+      parts_used: ["rhizome"]
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加 (大剂量姜黄素补充剂)"
+    mechanism_summary_cn: "姜黄素抑制血小板聚集; 高浓度抑制 CYP2C9/CYP3A4 (体外); 临床有 INR 升高病例报告."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+      - { type: enzyme, target: "CYP2C9", detail: "弱抑制" }
+    clinical_action: "饮食用姜黄无影响; 避免高剂量姜黄素补充剂 (e.g., > 500mg/d)."
+    monitoring: ["INR", "出血体征"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "curcumin warfarin INR case report"
+      - source_type: preclinical
+        evidence_keywords: "curcumin CYP2C9 inhibition in vitro"
+
+  - id: "INT-WF-ZANGHONGHUA-015"
+    drug: { id: "DRUG-WARFARIN", name_cn: "华法林", name_en: "Warfarin", atc_code: "B01AA03", therapeutic_index: "narrow" }
+    herb:
+      id: "HERB-ZANGHONGHUA"
+      name_cn: "藏红花 (西红花)"
+      name_pinyin: "zanghonghua"
+      name_latin: "Crocus sativus"
+      parts_used: ["stigma"]
+    severity: moderate
+    direction: increase
+    documentation: suspected
+    evidence_level: D
+    effect_cn: "理论性出血风险 (与红花机制相似但活性成分不同)"
+    mechanism_summary_cn: "藏红花酸 (crocetin)、藏红花苦素抑制血小板聚集; 临床互作数据有限, 主要为 PK/PD 推测."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免大剂量补充剂; 调料用量影响微."
+    monitoring: ["INR", "出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "Crocus sativus crocetin platelet aggregation"
+
+  # ---------------------------------------------------------------------------
+  # 阿司匹林 / 抗血小板系列
+  # ---------------------------------------------------------------------------
+
+  - id: "INT-ASA-DS-016"
+    drug:
+      id: "DRUG-ASPIRIN"
+      name_cn: "阿司匹林"
+      name_en: "Aspirin"
+      atc_code: "B01AC06"
+      drug_class: "Antiplatelet (COX-1 inhibitor)"
+    herb: { id: "HERB-DANSHEN", name_cn: "丹参", name_pinyin: "danshen", name_latin: "Salvia miltiorrhiza", parts_used: ["root"] }
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加 (尤其消化道); 国内冠心病常见联用 (阿司匹林 + 复方丹参滴丸), 是高频盲区."
+    mechanism_summary_cn: "丹参独立抗血小板活性 + 蛋白置换叠加阿司匹林效应."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "评估丹参的临床必要性; 如无强适应证建议停丹参. 必须合用时加强出血监测."
+    monitoring: ["消化道症状", "黑便", "皮下瘀斑"]
+    high_risk_groups: ["老年", "消化道溃疡史", "联用 PPI 不规律者"]
+    evidences:
+      - source_type: case_series
+        evidence_keywords: "aspirin danshen GI bleeding case series China"
+
+  - id: "INT-ASA-GINKGO-017"
+    drug: { id: "DRUG-ASPIRIN", name_cn: "阿司匹林", name_en: "Aspirin", atc_code: "B01AC06" }
+    herb: { id: "HERB-GINKGO", name_cn: "银杏叶", name_pinyin: "yinxingye", name_latin: "Ginkgo biloba", parts_used: ["leaf"] }
+    severity: moderate
+    direction: increase
+    documentation: established
+    evidence_level: B
+    effect_cn: "出血风险增加, 自发性前房积血/视网膜出血/硬膜下出血病例报告"
+    mechanism_summary_cn: "银杏内酯 B 拮抗 PAF + 阿司匹林 COX-1 抑制 → 双重抗血小板叠加."
+    mechanisms:
+      - { type: target, target: "PAF_receptor" }
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免银杏补充剂. 如需认知改善可考虑其他选择."
+    monitoring: ["出血体征", "眼底检查 (高危人群)"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "Rosenblatt M N Engl J Med 1997 ginkgo aspirin hyphema"
+      - source_type: review
+        evidence_keywords: "Bone KM Mol Nutr Food Res 2008 ginkgo bleeding"
+
+  - id: "INT-ASA-DASUAN-018"
+    drug: { id: "DRUG-ASPIRIN", name_cn: "阿司匹林", name_en: "Aspirin", atc_code: "B01AC06" }
+    herb: { id: "HERB-DASUAN", name_cn: "大蒜", name_pinyin: "dasuan", name_latin: "Allium sativum", parts_used: ["bulb"] }
+    severity: minor
+    direction: increase
+    documentation: suspected
+    evidence_level: D
+    effect_cn: "理论性出血风险叠加 (大剂量补充剂)"
+    mechanism_summary_cn: "大蒜抑制血小板聚集 + 阿司匹林 COX-1 抑制双重叠加."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "饮食量无须避忌; 避免大剂量大蒜补充剂."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "garlic aspirin platelet aggregation"
+
+  - id: "INT-CLOPIDOGREL-SJW-019"
+    drug:
+      id: "DRUG-CLOPIDOGREL"
+      name_cn: "氯吡格雷"
+      name_en: "Clopidogrel"
+      atc_code: "B01AC04"
+      drug_class: "P2Y12 inhibitor (prodrug)"
+    herb: { id: "HERB-GUANYE-LIANQIAO", name_cn: "贯叶连翘 (圣约翰草)", name_pinyin: "guanyelianqiao", name_latin: "Hypericum perforatum", parts_used: ["aerial parts"] }
+    severity: moderate
+    direction: variable
+    documentation: probable
+    evidence_level: C
+    effect_cn: "复杂双向: SJW 通过诱导 CYP3A4 增加活性代谢物 (出血风险↑); 但同时影响多个 CYP 通路, 个体差异大."
+    mechanism_summary_cn: |
+      氯吡格雷需 CYP2C19 + CYP3A4 双步活化为活性硫醇代谢物.
+      SJW 强诱导 CYP3A4 → 活性代谢物增多 → 抗血小板效应增强 → 出血风险.
+      但部分研究示总效应取决于 CYP2C19 基因型.
+    mechanisms:
+      - { type: enzyme, target: "CYP3A4", detail: "诱导" }
+      - { type: enzyme, target: "CYP2C19" }
+    clinical_action: "避免合用 (双向不可预测)."
+    monitoring: ["出血体征", "血小板功能 (如可用)"]
+    evidences:
+      - source_type: pk_study
+        evidence_keywords: "Lau WC Cardiovasc Drug Ther 2011 St John wort clopidogrel"
+
+  - id: "INT-CLOPIDOGREL-GINKGO-020"
+    drug: { id: "DRUG-CLOPIDOGREL", name_cn: "氯吡格雷", name_en: "Clopidogrel", atc_code: "B01AC04" }
+    herb: { id: "HERB-GINKGO", name_cn: "银杏叶", name_pinyin: "yinxingye", name_latin: "Ginkgo biloba", parts_used: ["leaf"] }
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加 (尤其老年 PCI 术后人群)"
+    mechanism_summary_cn: "PAF 受体拮抗 + P2Y12 抑制双重抗血小板叠加."
+    mechanisms:
+      - { type: target, target: "PAF_receptor" }
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免合用. PCI 术后 DAPT 期间尤需明确告知."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "ginkgo clopidogrel bleeding PCI"
+
+  - id: "INT-TICAGRELOR-WUWEIZI-021"
+    drug:
+      id: "DRUG-TICAGRELOR"
+      name_cn: "替格瑞洛"
+      name_en: "Ticagrelor"
+      atc_code: "B01AC24"
+      drug_class: "P2Y12 inhibitor"
+    herb:
+      id: "HERB-WUWEIZI"
+      name_cn: "五味子"
+      name_pinyin: "wuweizi"
+      name_latin: "Schisandra chinensis"
+      parts_used: ["fruit"]
+    severity: moderate
+    direction: increase
+    documentation: theoretical
+    evidence_level: D
+    effect_cn: "理论性血药浓度升高, 出血风险增加"
+    mechanism_summary_cn: |
+      替格瑞洛是 CYP3A4 强底物.
+      五味子素 (schisantherin/schizandrin) 是 CYP3A4 强抑制剂 (对他克莫司、环孢素影响显著).
+      推测合用使替格瑞洛 AUC 显著升高.
+    mechanisms:
+      - { type: enzyme, target: "CYP3A4", detail: "五味子抑制" }
+    clinical_action: "避免合用. 替格瑞洛 FDA 标签明确禁止与 CYP3A4 强抑制剂合用."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: pk_study
+        evidence_keywords: "Schisandra CYP3A4 inhibition tacrolimus"
+      - source_type: monograph
+        evidence_keywords: "ticagrelor FDA label CYP3A4 strong inhibitor"
+
+  - id: "INT-ASA-CHUANXIONG-022"
+    drug: { id: "DRUG-ASPIRIN", name_cn: "阿司匹林", name_en: "Aspirin", atc_code: "B01AC06" }
+    herb: { id: "HERB-CHUANXIONG", name_cn: "川芎", name_pinyin: "chuanxiong", name_latin: "Ligusticum chuanxiong", parts_used: ["rhizome"] }
+    severity: moderate
+    direction: increase
+    documentation: probable
+    evidence_level: C
+    effect_cn: "出血风险增加 (双重抗血小板)"
+    mechanism_summary_cn: "川芎嗪抑制血小板聚集 + 阿司匹林 COX-1 抑制叠加."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免合用. 川芎注射剂在国内冠心病住院患者中常用, 与阿司匹林并用尤需警惕."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "tetramethylpyrazine aspirin platelet"
+
+  # ---------------------------------------------------------------------------
+  # NOAC (新型口服抗凝药) 系列
+  # 大多数证据级别为 D, 因 NOACs 上市较晚, 中药互作研究尚不充分
+  # ---------------------------------------------------------------------------
+
+  - id: "INT-DABIGATRAN-SJW-023"
+    drug:
+      id: "DRUG-DABIGATRAN"
+      name_cn: "达比加群"
+      name_en: "Dabigatran"
+      atc_code: "B01AE07"
+      drug_class: "Direct thrombin inhibitor"
+    herb: { id: "HERB-GUANYE-LIANQIAO", name_cn: "贯叶连翘 (圣约翰草)", name_pinyin: "guanyelianqiao", name_latin: "Hypericum perforatum", parts_used: ["aerial parts"] }
+    severity: major
+    direction: decrease
+    documentation: established
+    evidence_level: B
+    effect_cn: "达比加群血药浓度降低, 抗凝失效, 血栓栓塞风险"
+    mechanism_summary_cn: "达比加群酯是 P-gp 底物; SJW 强诱导 P-gp → 肠道吸收减少 → AUC 显著下降."
+    mechanisms:
+      - { type: transporter, target: "P-gp", detail: "诱导" }
+    clinical_action: "禁忌合用. FDA / EMA 标签明确警示."
+    monitoring: ["dTT/aPTT (评估抗凝活性)", "血栓事件"]
+    evidences:
+      - source_type: monograph
+        evidence_keywords: "dabigatran FDA label P-gp inducer"
+      - source_type: pk_study
+        evidence_keywords: "Hartter S Br J Clin Pharmacol 2012 dabigatran P-gp"
+
+  - id: "INT-RIVAROXABAN-SJW-024"
+    drug:
+      id: "DRUG-RIVAROXABAN"
+      name_cn: "利伐沙班"
+      name_en: "Rivaroxaban"
+      atc_code: "B01AF01"
+      drug_class: "Factor Xa inhibitor"
+    herb: { id: "HERB-GUANYE-LIANQIAO", name_cn: "贯叶连翘 (圣约翰草)", name_pinyin: "guanyelianqiao", name_latin: "Hypericum perforatum", parts_used: ["aerial parts"] }
+    severity: major
+    direction: decrease
+    documentation: established
+    evidence_level: B
+    effect_cn: "利伐沙班浓度显著降低, 抗凝失效"
+    mechanism_summary_cn: "利伐沙班同时是 CYP3A4 与 P-gp 双底物; SJW 双重诱导 → 暴露量大幅减少."
+    mechanisms:
+      - { type: enzyme, target: "CYP3A4", detail: "诱导" }
+      - { type: transporter, target: "P-gp", detail: "诱导" }
+    clinical_action: "禁忌合用. 制造商说明书明确标注."
+    monitoring: ["抗 Xa 活性 (如可测)", "血栓事件"]
+    evidences:
+      - source_type: monograph
+        evidence_keywords: "rivaroxaban FDA label CYP3A4 P-gp strong inducer"
+
+  - id: "INT-APIXABAN-SJW-025"
+    drug:
+      id: "DRUG-APIXABAN"
+      name_cn: "阿哌沙班"
+      name_en: "Apixaban"
+      atc_code: "B01AF02"
+      drug_class: "Factor Xa inhibitor"
+    herb: { id: "HERB-GUANYE-LIANQIAO", name_cn: "贯叶连翘 (圣约翰草)", name_pinyin: "guanyelianqiao", name_latin: "Hypericum perforatum", parts_used: ["aerial parts"] }
+    severity: major
+    direction: decrease
+    documentation: established
+    evidence_level: B
+    effect_cn: "阿哌沙班浓度降低, 抗凝失效"
+    mechanism_summary_cn: "阿哌沙班是 CYP3A4 + P-gp 双底物 (类似利伐沙班), SJW 双重诱导."
+    mechanisms:
+      - { type: enzyme, target: "CYP3A4", detail: "诱导" }
+      - { type: transporter, target: "P-gp", detail: "诱导" }
+    clinical_action: "禁忌合用. 说明书警示."
+    monitoring: ["抗 Xa 活性", "血栓事件"]
+    evidences:
+      - source_type: monograph
+        evidence_keywords: "apixaban FDA label strong CYP3A4 P-gp inducer"
+
+  - id: "INT-EDOXABAN-SJW-026"
+    drug:
+      id: "DRUG-EDOXABAN"
+      name_cn: "艾多沙班"
+      name_en: "Edoxaban"
+      atc_code: "B01AF03"
+      drug_class: "Factor Xa inhibitor"
+    herb: { id: "HERB-GUANYE-LIANQIAO", name_cn: "贯叶连翘 (圣约翰草)", name_pinyin: "guanyelianqiao", name_latin: "Hypericum perforatum", parts_used: ["aerial parts"] }
+    severity: moderate
+    direction: decrease
+    documentation: probable
+    evidence_level: C
+    effect_cn: "艾多沙班浓度降低 (主要通过 P-gp), 抗凝效应减弱"
+    mechanism_summary_cn: "艾多沙班 CYP 代谢比例较低, 主要是 P-gp 底物; SJW 诱导 P-gp 致暴露下降."
+    mechanisms:
+      - { type: transporter, target: "P-gp", detail: "诱导" }
+    clinical_action: "避免合用. 必须合用时考虑其他抗凝方案."
+    monitoring: ["血栓事件"]
+    evidences:
+      - source_type: monograph
+        evidence_keywords: "edoxaban FDA label P-gp inducer"
+
+  - id: "INT-RIVAROXABAN-WUWEIZI-027"
+    drug: { id: "DRUG-RIVAROXABAN", name_cn: "利伐沙班", name_en: "Rivaroxaban", atc_code: "B01AF01" }
+    herb: { id: "HERB-WUWEIZI", name_cn: "五味子", name_pinyin: "wuweizi", name_latin: "Schisandra chinensis", parts_used: ["fruit"] }
+    severity: moderate
+    direction: increase
+    documentation: theoretical
+    evidence_level: D
+    effect_cn: "理论性血药浓度升高, 出血风险增加"
+    mechanism_summary_cn: "五味子素抑制 CYP3A4 与 P-gp; 利伐沙班为双底物, 推测 AUC 升高."
+    mechanisms:
+      - { type: enzyme, target: "CYP3A4", detail: "五味子抑制" }
+      - { type: transporter, target: "P-gp", detail: "可能抑制" }
+    clinical_action: "避免合用. 国内五味子常用于保肝/安神方剂, 处方时核查."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: pk_study
+        evidence_keywords: "Schisandra CYP3A4 inhibition substrate AUC"
+
+  - id: "INT-DABIGATRAN-DS-028"
+    drug: { id: "DRUG-DABIGATRAN", name_cn: "达比加群", name_en: "Dabigatran", atc_code: "B01AE07" }
+    herb: { id: "HERB-DANSHEN", name_cn: "丹参", name_pinyin: "danshen", name_latin: "Salvia miltiorrhiza", parts_used: ["root"] }
+    severity: moderate
+    direction: increase
+    documentation: suspected
+    evidence_level: D
+    effect_cn: "理论 + 个别病例: 出血风险增加"
+    mechanism_summary_cn: "丹参独立抗凝活性 + 可能影响 P-gp 转运叠加 PD 效应."
+    mechanisms:
+      - { type: pathway, target: "coagulation_cascade" }
+      - { type: transporter, target: "P-gp", detail: "可能抑制" }
+    clinical_action: "避免合用. 房颤抗凝换用 NOAC 后仍需停丹参."
+    monitoring: ["出血体征", "dTT (如可测)"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "dabigatran danshen bleeding case"
+
+  - id: "INT-NOAC-GINKGO-029"
+    drug: { id: "DRUG-RIVAROXABAN", name_cn: "利伐沙班 (代表 NOAC 类)", name_en: "Rivaroxaban (NOACs class)", atc_code: "B01AF01" }
+    herb: { id: "HERB-GINKGO", name_cn: "银杏叶", name_pinyin: "yinxingye", name_latin: "Ginkgo biloba", parts_used: ["leaf"] }
+    severity: moderate
+    direction: increase
+    documentation: suspected
+    evidence_level: D
+    effect_cn: "出血风险增加 (PD 叠加, 非 PK)"
+    mechanism_summary_cn: "银杏抗血小板 + NOAC 抗凝 → 出血风险叠加 (机制不同, 但临床效应相加)."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "避免银杏补充剂 (适用于 rivaroxaban / apixaban / edoxaban / dabigatran)."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: case_report
+        evidence_keywords: "ginkgo NOAC rivaroxaban bleeding case"
+    notes: "本条按类别推广, ingest 时可拆分为 4 个 NOAC 分别 1 条."
+
+  - id: "INT-NOAC-DASUAN-030"
+    drug: { id: "DRUG-APIXABAN", name_cn: "阿哌沙班 (代表 NOAC 类)", name_en: "Apixaban (NOACs class)", atc_code: "B01AF02" }
+    herb: { id: "HERB-DASUAN", name_cn: "大蒜", name_pinyin: "dasuan", name_latin: "Allium sativum", parts_used: ["bulb"] }
+    severity: minor
+    direction: increase
+    documentation: theoretical
+    evidence_level: D
+    effect_cn: "理论性出血风险 (大剂量补充剂)"
+    mechanism_summary_cn: "大蒜抗血小板 + NOAC 抗凝 PD 叠加."
+    mechanisms:
+      - { type: pathway, target: "platelet_aggregation" }
+    clinical_action: "饮食量无须避忌; 避免大蒜素补充剂."
+    monitoring: ["出血体征"]
+    evidences:
+      - source_type: preclinical
+        evidence_keywords: "garlic platelet aggregation NOAC"
+
+
+# =============================================================================
+# 后续扩展建议 (Phase 1.1 - Phase 2)
+# =============================================================================
+#
+# 缺口 1: 国内常用中成药复方 (待补充)
+#   - 血塞通 (含三七总皂苷) × 抗凝
+#   - 麝香保心丸 (含蟾酥/麝香) × 抗凝
+#   - 速效救心丸 (含川芎/冰片) × 抗凝
+#   - 通心络胶囊 (多组分) × 抗凝/抗血小板
+#
+# 缺口 2: 抗血小板药未涵盖
+#   - 西洛他唑 (cilostazol) × 中药 - CYP3A4 底物, 与五味子/SJW 互作
+#   - 普拉格雷 (prasugrel) × 中药
+#
+# 缺口 3: LMWH/磺达肝癸钠 × 中药
+#   - 一般注射剂受 CYP/P-gp 影响小, 但 PD 叠加仍有意义
+#
+# 缺口 4: 罕见但严重的中药
+#   - 雷公藤 (Tripterygium wilfordii) - 强免疫抑制, 与多数药物互作
+#   - 含马兜铃酸药材 (已禁用但历史方剂仍有)
+#
+# 总目标: Phase 1 完成 ~50 条心血管抗凝核心条目, Phase 2 扩展至 100+
+# =============================================================================
