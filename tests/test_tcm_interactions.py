@@ -181,3 +181,101 @@ def test_api_invalid_severity_rejected(loaded_client):
         params={"severity": "extreme"},  # 不在枚举内
     )
     assert resp.status_code == 422
+
+
+# ===== 批量风险检查 / 自动补全 =====
+
+
+def test_lookup_finds_drug_herb_formula(loaded_client):
+    resp = loaded_client.get("/api/v1/tcm/lookup", params={"q": "丹"})
+    assert resp.status_code == 200
+    body = resp.json()
+    types = {item["type"] for item in body}
+    # 丹参 (herb) 与 复方丹参滴丸 (formula) 都应命中
+    assert "herb" in types
+    assert "formula" in types
+
+
+def test_lookup_drug_by_atc(loaded_client):
+    resp = loaded_client.get("/api/v1/tcm/lookup", params={"q": "B01AA"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert any(item["type"] == "drug" and item["name_cn"] == "华法林" for item in body)
+
+
+def test_lookup_empty_query_rejected(loaded_client):
+    resp = loaded_client.get("/api/v1/tcm/lookup", params={"q": ""})
+    assert resp.status_code == 422
+
+
+def test_batch_check_finds_warfarin_danshen_pair(loaded_client):
+    """临床场景: 病人在用华法林+丹参+阿司匹林+硝酸甘油."""
+    resp = loaded_client.post(
+        "/api/v1/tcm/batch-check",
+        json={"items": ["华法林", "丹参", "阿司匹林", "硝酸甘油"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    types_by_raw = {c["raw"]: c["type"] for c in body["items"]}
+    assert types_by_raw["华法林"] == "drug"
+    assert types_by_raw["丹参"] == "herb"
+    assert types_by_raw["阿司匹林"] == "drug"
+    assert types_by_raw["硝酸甘油"] == "unknown"  # 不在 seed 里
+
+    # 应找到至少 2 条互作: 华法林+丹参, 阿司匹林+丹参
+    assert len(body["interactions"]) >= 2
+    pairs = {(i["drug"]["name_cn"], i["herb"]["name_cn"]) for i in body["interactions"] if i.get("herb")}
+    assert ("华法林", "丹参") in pairs
+    assert ("阿司匹林", "丹参") in pairs
+
+    # summary 应有 major
+    assert body["summary"].get("major", 0) >= 1
+
+
+def test_batch_check_recognizes_formula(loaded_client):
+    resp = loaded_client.post(
+        "/api/v1/tcm/batch-check",
+        json={"items": ["华法林", "复方丹参滴丸"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    types = {c["type"] for c in body["items"]}
+    assert "formula" in types
+    # 至少应找到 INT-WF-FFDS-002
+    ids = {i["id"] for i in body["interactions"]}
+    assert "INT-WF-FFDS-002" in ids
+
+
+def test_batch_check_no_interaction_when_only_western_drugs(loaded_client):
+    """只有西药、没有中药/方剂时不应返回互作."""
+    resp = loaded_client.post(
+        "/api/v1/tcm/batch-check",
+        json={"items": ["华法林", "阿司匹林"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["interactions"] == []
+    assert body["summary"] == {}
+
+
+def test_batch_check_interactions_sorted_by_severity(loaded_client):
+    resp = loaded_client.post(
+        "/api/v1/tcm/batch-check",
+        json={
+            "items": ["华法林", "丹参", "银杏叶", "贯叶连翘 (圣约翰草)"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    severities = [i["severity"] for i in body["interactions"]]
+    rank = {"major": 1, "moderate": 2, "minor": 3, "theoretical": 4}
+    assert severities == sorted(severities, key=lambda s: rank.get(s, 99))
+
+
+def test_batch_check_empty_input_returns_empty(loaded_client):
+    resp = loaded_client.post("/api/v1/tcm/batch-check", json={"items": []})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["items"] == []
+    assert body["interactions"] == []

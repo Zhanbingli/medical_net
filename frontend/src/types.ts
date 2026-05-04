@@ -1,87 +1,35 @@
-export interface GraphNode {
-  id: string;
-  label: string;
-  type: 'drug' | 'condition';
-  description?: string | null;
-}
+// 中药 × 西药相互作用 - 前端类型
 
-export interface GraphLink {
-  source: string;
-  target: string;
-  label?: string | null;
-  metadata?: Record<string, unknown> | null;
-}
+export type Severity = 'major' | 'moderate' | 'minor' | 'theoretical';
+export type Direction = 'increase' | 'decrease' | 'variable';
+export type EntityType = 'drug' | 'herb' | 'formula' | 'unknown';
 
-export interface GraphSummary {
-  total_nodes: number;
-  total_links: number;
-  condition_count: number;
-  interaction_count: number;
-  partner_count: number;
-  severity_breakdown: Record<string, number>;
-}
-
-export interface DrugGraph {
-  nodes: GraphNode[];
-  links: GraphLink[];
-  summary: GraphSummary;
-}
-
-export interface DrugConditionSummary {
-  id: string;
-  name: string;
-  description?: string | null;
-  evidence_level?: string | null;
-  usage_note?: string | null;
-}
-
-export interface DrugInteractionSummary {
-  id: string;
-  interacting_drug_id: string;
-  interacting_drug_name?: string | null;
-  severity: string;
-  mechanism?: string | null;
-  management?: string | null;
-}
-
-export interface DrugDetail {
-  id: string;
-  name: string;
-  description?: string | null;
-  atc_code?: string | null;
-  indications: DrugConditionSummary[];
-  interactions: DrugInteractionSummary[];
-}
-
-export interface DrugSummary {
-  id: string;
-  name: string;
-  description?: string | null;
-  atc_code?: string | null;
-}
-
-// ===== TCM × Western drug interactions =====
-
-export interface TcmDrugBrief {
+export interface DrugBrief {
   id: string;
   name_cn: string;
   atc_code?: string | null;
 }
 
-export interface TcmHerbBrief {
+export interface HerbBrief {
   id: string;
   name_cn: string;
   name_pinyin?: string | null;
   name_latin?: string | null;
 }
 
-export interface TcmFormulaBrief {
+export interface FormulaBrief {
   id: string;
   name_cn: string;
   composition_text?: string | null;
 }
 
-export interface TcmEvidenceBrief {
+export interface Mechanism {
+  type?: string | null;
+  target?: string | null;
+  detail?: string | null;
+}
+
+export interface Evidence {
   source_type: string;
   citation: string;
   pmid?: string | null;
@@ -90,59 +38,42 @@ export interface TcmEvidenceBrief {
   evidence_keywords?: string | null;
 }
 
-export interface TcmMechanism {
-  type?: string | null;
-  target?: string | null;
-  detail?: string | null;
-}
-
-export type TcmSeverity = 'major' | 'moderate' | 'minor' | 'theoretical';
-
-export interface TcmInteraction {
+export interface Interaction {
   id: string;
-  drug: TcmDrugBrief;
-  herb?: TcmHerbBrief | null;
-  formula?: TcmFormulaBrief | null;
-  severity: TcmSeverity;
-  direction: 'increase' | 'decrease' | 'variable';
+  drug: DrugBrief;
+  herb?: HerbBrief | null;
+  formula?: FormulaBrief | null;
+  severity: Severity;
+  direction: Direction;
   onset?: string | null;
   documentation?: string | null;
   evidence_level: string;
   effect_cn: string;
   mechanism_summary_cn: string;
-  mechanisms: TcmMechanism[];
+  mechanisms: Mechanism[];
   clinical_action: string;
   monitoring: string[];
   high_risk_groups: string[];
   notes?: string | null;
-  evidences: TcmEvidenceBrief[];
+  evidences: Evidence[];
 }
 
-export interface TcmInteractionList {
-  total: number;
-  items: TcmInteraction[];
+export interface LookupResult {
+  type: 'drug' | 'herb' | 'formula';
+  id: string;
+  name_cn: string;
+  extra?: string | null;
 }
 
-export interface TcmStats {
-  total_interactions: number;
-  by_severity: Record<string, number>;
-  by_evidence_level: Record<string, number>;
-  by_direction: Record<string, number>;
+export interface ClassifiedItem {
+  raw: string;
+  type: EntityType;
+  matched_id?: string | null;
+  matched_name?: string | null;
 }
 
-// D3 Force Simulation Types
-export interface D3SimulationNode extends GraphNode {
-  x?: number;
-  y?: number;
-  fx?: number | null;
-  fy?: number | null;
-  index?: number;
-}
-
-export interface D3SimulationLink {
-  source: string | D3SimulationNode;
-  target: string | D3SimulationNode;
-  label?: string | null;
-  metadata?: Record<string, unknown> | null;
-  index?: number;
+export interface BatchCheckResult {
+  items: ClassifiedItem[];
+  interactions: Interaction[];
+  summary: Partial<Record<Severity, number>>;
 }

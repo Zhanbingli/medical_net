@@ -1,5 +1,4 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import StatusMessage from './StatusMessage';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -22,32 +21,21 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log error to console in development
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-
-    // In production, you could send this to an error reporting service
-    // Example: logErrorToService(error, errorInfo);
   }
 
   render(): ReactNode {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
+      if (this.props.fallback) return this.props.fallback;
       return (
-        <StatusMessage
-          tone="error"
-          title="组件加载失败"
-          description={
-            process.env.NODE_ENV === 'development'
-              ? this.state.error?.message
-              : '页面出现错误，请刷新页面重试。'
-          }
-        />
+        <div className="error-banner">
+          组件加载失败:{' '}
+          {process.env.NODE_ENV === 'development'
+            ? this.state.error?.message
+            : '请刷新页面重试'}
+        </div>
       );
     }
-
     return this.props.children;
   }
 }

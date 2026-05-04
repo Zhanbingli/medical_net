@@ -64,3 +64,35 @@ class StatsResponse(BaseModel):
     by_severity: dict[str, int]
     by_evidence_level: dict[str, int]
     by_direction: dict[str, int]
+
+
+# ===== 批量风险检查 =====
+
+
+class LookupResult(BaseModel):
+    """药单输入框的自动补全结果."""
+
+    type: str = Field(..., description="drug | herb | formula")
+    id: str
+    name_cn: str
+    extra: Optional[str] = Field(None, description="ATC / 拉丁名 / 方剂组成 等辅助信息")
+
+
+class BatchCheckRequest(BaseModel):
+    items: list[str] = Field(..., description="病人当前在用的药物名 (西药+中药+方剂混合)")
+
+
+class ClassifiedItem(BaseModel):
+    raw: str
+    type: str = Field(..., description="drug | herb | formula | unknown")
+    matched_id: Optional[str] = None
+    matched_name: Optional[str] = None
+
+
+class BatchCheckResponse(BaseModel):
+    items: list[ClassifiedItem]
+    interactions: list[HerbDrugInteractionResponse]
+    summary: dict[str, int] = Field(
+        default_factory=dict,
+        description="按严重度计数, 如 {major: 2, moderate: 5}",
+    )
