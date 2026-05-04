@@ -18,3 +18,4 @@ requests==2.32.3
 tenacity==8.2.3
 slowapi==0.1.9
 python-multipart==0.0.9
+PyYAML==6.0.2
