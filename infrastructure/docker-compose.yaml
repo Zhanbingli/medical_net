@@ -53,21 +53,6 @@ services:
       timeout: 5s
       retries: 5
 
-  etl:
-    build: ../etl
-    command: python -m pipelines.scheduler
-    depends_on:
-      - db
-      - redis
-    env_file:
-      - ../.env
-    environment:
-      DATABASE_URL: postgresql+psycopg://drugnet:drugnet@db:5432/drugnet
-      REDIS_URL: redis://redis:6379/0
-    volumes:
-      - ../etl:/app
-    restart: unless-stopped
-
   frontend:
     build: ../frontend
     command: /bin/sh -c "if [ ! -d node_modules ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port 5173"
